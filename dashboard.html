@@ -313,6 +313,14 @@
                 <div class="countdown-text" id="dash-countdown">⏳ Próximo ciclo en: calculando...</div>
 
                 <div id="quick-edit-panel" class="quick-edit-panel hidden">
+                    <div style="margin-bottom: 8px;">
+                        <span class="qe-label" style="color: var(--accent-color);">📋 MODELO DE OPERACIÓN</span>
+                        <select id="qe-model-select" class="qe-select">
+                            <option value="presion">Presión Constante</option>
+                            <option value="nm">Modo Normal (NM)</option>
+                        </select>
+                    </div>
+
                     <div id="qe-presion-fields">
                         <span class="qe-label" style="color: var(--warning-color);">🌙 HORARIO DE DESCANSO</span>
                         <div class="qe-grid">
@@ -560,38 +568,48 @@
             return String(m).padStart(2, '0');
         }
 
-        function cargarFormularioRapido() {
-            if (cfg.model === 'presion') {
+        function alternarVisibilidadCamposPlan(modeloSeleccionado) {
+            if (modeloSeleccionado === 'presion') {
                 document.getElementById('qe-presion-fields').style.display = 'block';
                 document.getElementById('qe-nm-fields').style.display = 'none';
-
-                document.getElementById('qe-rest-start-h').value = cfg.restStartH || 12;
-                document.getElementById('qe-rest-start-m').value = formatMin(cfg.restStartM || 0);
-                document.getElementById('qe-rest-start-ampm').value = cfg.restStartAmPm || 'AM';
-
-                document.getElementById('qe-rest-end-h').value = cfg.restEndH || 5;
-                document.getElementById('qe-rest-end-m').value = formatMin(cfg.restEndM || 0);
-                document.getElementById('qe-rest-end-ampm').value = cfg.restEndAmPm || 'AM';
-
-                sincronizarHorariosDashboard();
-                document.getElementById('qe-pump-alternate').value = cfg.pumpAlternateHours || 6;
             } else {
                 document.getElementById('qe-presion-fields').style.display = 'none';
                 document.getElementById('qe-nm-fields').style.display = 'block';
-
-                const diasActuales = cfg.nmDays || ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-                document.querySelectorAll('input[name="qe-nm-days"]').forEach(cb => {
-                    cb.checked = diasActuales.includes(cb.value);
-                });
-
-                document.getElementById('qe-nm-start-h').value = cfg.nmStartH || 8;
-                document.getElementById('qe-nm-start-m').value = formatMin(cfg.nmStartM || 0);
-                document.getElementById('qe-nm-start-ampm').value = cfg.nmStartAmPm || 'AM';
-
-                document.getElementById('qe-nm-end-h').value = cfg.nmEndH || 5;
-                document.getElementById('qe-nm-end-m').value = formatMin(cfg.nmEndM || 0);
-                document.getElementById('qe-nm-end-ampm').value = cfg.nmEndAmPm || 'PM';
             }
+        }
+
+        document.getElementById('qe-model-select').addEventListener('change', (e) => {
+            alternarVisibilidadCamposPlan(e.target.value);
+        });
+
+        function cargarFormularioRapido() {
+            const modeloActual = cfg.model || 'presion';
+            document.getElementById('qe-model-select').value = modeloActual;
+            alternarVisibilidadCamposPlan(modeloActual);
+
+            document.getElementById('qe-rest-start-h').value = cfg.restStartH || 12;
+            document.getElementById('qe-rest-start-m').value = formatMin(cfg.restStartM || 0);
+            document.getElementById('qe-rest-start-ampm').value = cfg.restStartAmPm || 'AM';
+
+            document.getElementById('qe-rest-end-h').value = cfg.restEndH || 5;
+            document.getElementById('qe-rest-end-m').value = formatMin(cfg.restEndM || 0);
+            document.getElementById('qe-rest-end-ampm').value = cfg.restEndAmPm || 'AM';
+
+            sincronizarHorariosDashboard();
+            document.getElementById('qe-pump-alternate').value = cfg.pumpAlternateHours || 6;
+
+            const diasActuales = cfg.nmDays || ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            document.querySelectorAll('input[name="qe-nm-days"]').forEach(cb => {
+                cb.checked = diasActuales.includes(cb.value);
+            });
+
+            document.getElementById('qe-nm-start-h').value = cfg.nmStartH || 8;
+            document.getElementById('qe-nm-start-m').value = formatMin(cfg.nmStartM || 0);
+            document.getElementById('qe-nm-start-ampm').value = cfg.nmStartAmPm || 'AM';
+
+            document.getElementById('qe-nm-end-h').value = cfg.nmEndH || 5;
+            document.getElementById('qe-nm-end-m').value = formatMin(cfg.nmEndM || 0);
+            document.getElementById('qe-nm-end-ampm').value = cfg.nmEndAmPm || 'PM';
         }
 
         const quickEditPanel = document.getElementById('quick-edit-panel');
@@ -609,6 +627,9 @@
         });
 
         document.getElementById('btn-qe-save').addEventListener('click', () => {
+            const modeloElegido = document.getElementById('qe-model-select').value;
+            cfg.model = modeloElegido;
+
             if (cfg.model === 'presion') {
                 const altHours = parseInt(document.getElementById('qe-pump-alternate').value);
                 if (!altHours || altHours < 1) {
@@ -662,6 +683,9 @@
             renderPlanText();
             actualizarCuentaRegresiva();
             quickEditPanel.classList.add('hidden');
+
+            // Envía el plan por MQTT y también por HTTP local si está disponible
+            enviarComandoRemoto("lu/tank/set", { plan: cfg });
 
             fetch('/config', {
                 method: 'POST',
@@ -784,11 +808,10 @@
             }
         }
 
-        // CORREGIDO: Lectura dinámica de capacidad_total y offset enviados por el ESP32
         function actualizarDashboardVisual(data) {
             const porcentaje = Math.min(100, Math.max(0, data.nivel));
             const litros = data.litros;
-            const capacidadTotal = data.capacidad_total !== undefined ? data.capacidad_total : 488; // Lee el valor real del ESP32
+            const capacidadTotal = data.capacidad_total !== undefined ? data.capacidad_total : 488;
             const caudal = data.caudal;
 
             const faltante = Math.max(0, capacidadTotal - litros);
@@ -799,10 +822,7 @@
 
             document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${offsetVal} cm`;
             document.getElementById('dash-percent').textContent = `${porcentaje.toFixed(1)}%`;
-            
-            // CORREGIDO: Muestra el total de litros real enviado por el ESP32 en lugar del estático 1000L
             document.getElementById('dash-liters').textContent = `${Math.round(litros)} / ${Math.round(capacidadTotal)} L`;
-            
             document.getElementById('dash-flow').textContent = `${caudal.toFixed(1)} L/min`;
             document.getElementById('dash-time').textContent = porcentaje >= 98 ? 'Lleno' : (caudal == 0 ? '----' : `${tiempoMinutos} min`);
 
