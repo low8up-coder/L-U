@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L&U Monitor - Dashboard</title>
+    <!-- Librería MQTT para JavaScript (Permite conectar el navegador a EMQX Cloud vía WebSockets) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --card-inner: #334155;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --border-color: #475569;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 440px; }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        h2 { margin: 0 0 6px 0; text-align: center; font-size: 1.5rem; }
+        .subtitle { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
+
+        .tank-visual {
+            background-color: var(--card-inner);
+            border-radius: 12px;
+            height: 150px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .water-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.85) 0%, rgba(37, 99, 235, 0.95) 100%);
+            transition: height 0.5s ease;
+            z-index: 1;
+        }
+
+        .offset-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.15) 8px, rgba(245, 158, 11, 0.25) 8px, rgba(245, 158, 11, 0.25) 16px);
+            border-bottom: 1px dashed var(--warning-color);
+            z-index: 2;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+            padding: 2px 6px;
+            box-sizing: border-box;
+            font-size: 0.65rem;
+            color: var(--warning-color);
+        }
+
+        .water-info {
+            position: relative;
+            z-index: 3;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .water-percent { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+        .water-liters { font-size: 0.85rem; margin-top: 4px; color: #e2e8f0; }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .metric-box {
+            background-color: var(--card-inner);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        .metric-value { font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
+
+        .pumps-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .pump-card {
+            background-color: var(--card-inner);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        .pump-name { font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; }
+        .pump-status {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .status-trabajo { background-color: rgba(16, 185, 129, 0.2); color: var(--success-color); border: 1px solid var(--success-color); }
+        .status-descanso { background-color: rgba(239, 68, 68, 0.2); color: var(--danger-color); border: 1px solid var(--danger-color); }
+
+        .plan-box {
+            background-color: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+
+        .plan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .plan-title { font-size: 0.8rem; color: var(--accent-color); font-weight: 700; text-transform: uppercase; margin: 0; }
+        .plan-desc { font-size: 0.85rem; line-height: 1.4; }
+        .countdown-text { font-size: 0.82rem; color: var(--warning-color); margin-top: 6px; font-weight: bold; }
+
+        .btn-edit-inline {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            color: var(--text-color);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-edit-inline:hover { background: rgba(59, 130, 246, 0.4); }
+
+        .quick-edit-panel {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.15);
+        }
+        .quick-edit-panel.hidden { display: none; }
+        .qe-label { font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 3px; }
+        .qe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+        .qe-box { background: var(--card-inner); padding: 5px; border-radius: 6px; }
+        .qe-sub { font-size: 0.62rem; color: var(--text-muted); display: block; margin-bottom: 2px; }
+        .qe-row { display: flex; gap: 2px; }
+        .qe-select, .qe-input {
+            width: 100%;
+            padding: 4px;
+            font-size: 0.78rem;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            box-sizing: border-box;
+        }
+        
+        .days-grid-qe {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        .day-checkbox-qe {
+            background: var(--card-inner);
+            border: 1px solid var(--border-color);
+            padding: 5px 6px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .day-checkbox-qe input { width: auto; margin: 0; accent-color: var(--accent-color); }
+
+        .qe-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+        .btn-qe-save {
+            background: var(--success-color);
+            color: #064e3b;
+            border: none;
+            border-radius: 6px;
+            padding: 7px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-qe-cancel {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 7px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .manual-controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        .pump-off { background-color: var(--success-color); color: #064e3b; }
+        .pump-on { background-color: var(--danger-color); color: white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+
+        .btn-all-container { margin-top: 8px; }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 8px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .btn-secondary:hover { color: var(--text-color); border-color: var(--text-color); }
+        .footer-note { text-align: center; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h2>L&amp;U Monitor</h2>
+            <div class="subtitle" id="dash-tank-type">Conectando con ESP32 / Nube...</div>
+
+            <div class="tank-visual">
+                <div class="offset-zone" id="visual-offset" style="height: 10%;">Zona Muerta (Offset)</div>
+                <div class="water-fill" id="visual-water" style="height: 0%;"></div>
+                <div class="water-info">
+                    <div class="water-percent" id="dash-percent">0.0%</div>
+                    <div class="water-liters" id="dash-liters">0 / 0 L</div>
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="metric-label">Caudal Actual</div>
+                    <div class="metric-value" id="dash-flow">0.0 L/min</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Tiempo Llenado</div>
+                    <div class="metric-value" id="dash-time">-- min</div>
+                </div>
+            </div>
+
+            <div class="pumps-container" id="pumps-status-container">
+                <div class="pump-card">
+                    <div class="pump-name">Bomba / Relé 1</div>
+                    <div class="pump-status status-descanso" id="pump-1-state">En Descanso</div>
+                </div>
+                <div class="pump-card">
+                    <div class="pump-name">Bomba / Relé 2</div>
+                    <div class="pump-status status-trabajo" id="pump-2-state">Trabajo</div>
+                </div>
+            </div>
+
+            <div class="plan-box">
+                <div class="plan-header">
+                    <div class="plan-title" id="dash-plan-title">Plan de Trabajo</div>
+                    <button type="button" id="btn-toggle-edit" class="btn-edit-inline">✏️ Editar</button>
+                </div>
+                <div class="plan-desc" id="dash-plan-desc">--</div>
+                <div class="countdown-text" id="dash-countdown">⏳ Próximo ciclo en: calculando...</div>
+
+                <div id="quick-edit-panel" class="quick-edit-panel hidden">
+                    <div id="qe-presion-fields">
+                        <span class="qe-label" style="color: var(--warning-color);">🌙 HORARIO DE DESCANSO</span>
+                        <div class="qe-grid">
+                            <div class="qe-box">
+                                <span class="qe-sub">INICIO DESCANSO</span>
+                                <div class="qe-row">
+                                    <select id="qe-rest-start-h" class="qe-select"></select>
+                                    <select id="qe-rest-start-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-rest-start-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                            <div class="qe-box">
+                                <span class="qe-sub">FIN DESCANSO</span>
+                                <div class="qe-row">
+                                    <select id="qe-rest-end-h" class="qe-select"></select>
+                                    <select id="qe-rest-end-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-rest-end-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <span class="qe-label" style="color: var(--success-color);">⚡ HORARIO DE TRABAJO (AUTOCALCULADO)</span>
+                        <div class="qe-grid">
+                            <div class="qe-box">
+                                <span class="qe-sub">INICIO TRABAJO</span>
+                                <div class="qe-row">
+                                    <select id="qe-work-start-h" disabled class="qe-select" style="opacity: 0.8;"></select>
+                                    <select id="qe-work-start-m" disabled class="qe-select" style="opacity: 0.8;"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-work-start-ampm" disabled class="qe-select" style="opacity: 0.8;"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                            <div class="qe-box">
+                                <span class="qe-sub">FIN TRABAJO</span>
+                                <div class="qe-row">
+                                    <select id="qe-work-end-h" disabled class="qe-select" style="opacity: 0.8;"></select>
+                                    <select id="qe-work-end-m" disabled class="qe-select" style="opacity: 0.8;"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-work-end-ampm" disabled class="qe-select" style="opacity: 0.8;"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 8px;">
+                            <span class="qe-label" style="color: var(--accent-color);">🔄 LAPSO PARA ALTERNAR BOMBAS (HORAS)</span>
+                            <input type="number" min="1" max="168" id="qe-pump-alternate" class="qe-input" value="6">
+                        </div>
+                    </div>
+
+                    <div id="qe-nm-fields" style="display: none;">
+                        <span class="qe-label" style="color: var(--text-muted);">📅 DÍAS DE OPERACIÓN</span>
+                        <div class="days-grid-qe">
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Lunes"> Lunes</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Martes"> Martes</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Miércoles"> Miércoles</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Jueves"> Jueves</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Viernes"> Viernes</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Sábado"> Sábado</label>
+                            <label class="day-checkbox-qe"><input type="checkbox" name="qe-nm-days" value="Domingo"> Domingo</label>
+                        </div>
+
+                        <span class="qe-label" style="color: var(--success-color);">⏰ HORAS DE TRABAJO</span>
+                        <div class="qe-grid" style="margin-bottom: 8px;">
+                            <div class="qe-box">
+                                <span class="qe-sub">INICIO TRABAJO</span>
+                                <div class="qe-row">
+                                    <select id="qe-nm-start-h" class="qe-select"></select>
+                                    <select id="qe-nm-start-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-nm-start-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                            <div class="qe-box">
+                                <span class="qe-sub">FIN TRABAJO</span>
+                                <div class="qe-row">
+                                    <select id="qe-nm-end-h" class="qe-select"></select>
+                                    <select id="qe-nm-end-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-nm-end-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="qe-actions">
+                        <button type="button" id="btn-qe-cancel" class="btn-qe-cancel">Cancelar</button>
+                        <button type="button" id="btn-qe-save" class="btn-qe-save">✔ Guardar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="manual-controls-grid">
+                <button type="button" id="btn-pump-1" class="btn pump-off">⚡ Bomba 1: OFF</button>
+                <button type="button" id="btn-pump-2" class="btn pump-off">⚡ Bomba 2: OFF</button>
+            </div>
+            <div class="btn-all-container">
+                <button type="button" id="btn-pump-all" class="btn pump-off">⚡ Encender Ambas a la Vez</button>
+            </div>
+
+            <button type="button" id="btn-back" class="btn-secondary">
+                ⚙ Volver a Configuración
+            </button>
+        </div>
+        <div class="footer-note">L&amp;U Engineering</div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURACIÓN MQTT WEB (EMQX CLOUD WSS)
+        // ==========================================
+        const mqtt_host = "de96f323.ala.us-east-1.emqxsl.com";
+        const mqtt_port = 8084; // Puerto WebSocket seguro (WSS)
+        const mqtt_user = "Admin"; 
+        const mqtt_pass = "Admin"; 
+        
+        let clientId = "WebClient_" + Math.random().toString(16).substring(2, 8);
+        let client = new Paho.MQTT.Client(mqtt_host, Number(mqtt_port), "/mqtt", clientId);
+
+        client.onConnectionLost = function(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log("Conexión MQTT perdida: " + responseObject.errorMessage);
+                setTimeout(conectarMQTT, 5000); // Reintentar conexión automática
+            }
+        };
+
+        client.onMessageArrived = function(message) {
+            if (message.destinationName === "lu/tank/telemetry") {
+                try {
+                    let data = JSON.parse(message.payloadString);
+                    manualPump1 = (data.pump1 === 1);
+                    manualPump2 = (data.pump2 === 1);
+                    actualizarEstadoRelesWeb();
+                    actualizarDashboardVisual(data);
+                } catch(e) {}
+            }
+        };
+
+        function conectarMQTT() {
+            let options = {
+                invocationContext: {host: mqtt_host, port: Number(mqtt_port), clientId: clientId},
+                timeout: 3,
+                useSSL: true, // Obligatorio para el puerto 8084
+                userName: mqtt_user,
+                password: mqtt_pass,
+                onSuccess: function() {
+                    console.log("Conectado a EMQX Cloud vía WebSocket");
+                    client.subscribe("lu/tank/telemetry");
+                },
+                onFailure: function(message) {
+                    console.log("Fallo al conectar MQTT: " + message.errorMessage);
+                    setTimeout(conectarMQTT, 5000);
+                }
+            };
+            client.connect(options);
+        }
+
+        // Iniciar conexión MQTT en segundo plano
+        conectarMQTT();
+
+        // Función auxiliar para publicar comandos a la nube o por red local
+        function enviarComandoRemoto(topic, payloadObj) {
+            // 1. Intentar enviar por MQTT si está conectado
+            if (client && client.isConnected()) {
+                let message = new Paho.MQTT.Message(JSON.stringify(payloadObj));
+                message.destinationName = topic;
+                client.send(message);
+            }
+        }
+
+        // ==========================================
+        // LÓGICA ORIGINAL DE LA PÁGINA
+        // ==========================================
+        const rawConfig = localStorage.getItem('lu_tank_config');
+        
+        let cfg = rawConfig ? JSON.parse(rawConfig) : {
+            model: 'presion',
+            restStartH: 12, restStartM: 0, restStartAmPm: 'AM',
+            restEndH: 5, restEndM: 0, restEndAmPm: 'AM',
+            workStartH: 5, workStartM: 0, workStartAmPm: 'AM',
+            workEndH: 12, workEndM: 0, workEndAmPm: 'PM',
+            restTime: '12:00 AM a 5:00 AM',
+            workTime: '5:00 AM a 12:00 PM',
+            pumpAlternateHours: 6,
+            nmDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+            nmStartH: 8, nmStartM: 0, nmStartAmPm: 'AM',
+            nmEndH: 5, nmEndM: 0, nmEndAmPm: 'PM',
+            nmTime: '8:00 AM a 5:00 PM',
+            tank: 'cilindrico',
+            th: 190,
+            offset: 20,
+            radio_cilindro: 30.25,
+            lado_cuadrado: 50,
+            ancho_rect: 40,
+            largo_rect: 60,
+            radio_inf_cono: 20,
+            radio_sup_cono: 45
+        };
+
+        ['qe-rest-start-h', 'qe-rest-end-h', 'qe-work-start-h', 'qe-work-end-h', 'qe-nm-start-h', 'qe-nm-end-h'].forEach(id => {
+            const sel = document.getElementById(id);
+            for (let i = 1; i <= 12; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i;
+                sel.appendChild(opt);
+            }
+        });
+
+        function sincronizarHorariosDashboard() {
+            const restEndH = document.getElementById('qe-rest-end-h').value;
+            const restEndM = document.getElementById('qe-rest-end-m').value;
+            const restEndAmPm = document.getElementById('qe-rest-end-ampm').value;
+
+            const restStartH = document.getElementById('qe-rest-start-h').value;
+            const restStartM = document.getElementById('qe-rest-start-m').value;
+            const restStartAmPm = document.getElementById('qe-rest-start-ampm').value;
+
+            document.getElementById('qe-work-start-h').innerHTML = `<option value="${restEndH}" selected>${restEndH}</option>`;
+            document.getElementById('qe-work-start-m').innerHTML = `<option value="${restEndM}" selected>${restEndM}</option>`;
+            document.getElementById('qe-work-start-ampm').innerHTML = `<option value="${restEndAmPm}" selected>${restEndAmPm}</option>`;
+
+            document.getElementById('qe-work-end-h').innerHTML = `<option value="${restStartH}" selected>${restStartH}</option>`;
+            document.getElementById('qe-work-end-m').innerHTML = `<option value="${restStartM}" selected>${restStartM}</option>`;
+            document.getElementById('qe-work-end-ampm').innerHTML = `<option value="${restStartAmPm}" selected>${restStartAmPm}</option>`;
+        }
+
+        ['qe-rest-start-h', 'qe-rest-start-m', 'qe-rest-start-ampm', 'qe-rest-end-h', 'qe-rest-end-m', 'qe-rest-end-ampm'].forEach(id => {
+            document.getElementById(id).addEventListener('change', sincronizarHorariosDashboard);
+        });
+
+        const tankNames = {
+            'cilindrico': 'Tanque Cilíndrico',
+            'cuadrado': 'Tanque Cuadrado',
+            'rectangular': 'Tanque Rectangular',
+            'cono': 'Tanque Cono Invertido'
+        };
+
+        function renderPlanText() {
+            if (cfg.model === 'presion') {
+                document.getElementById('dash-plan-title').textContent = 'Modelo: Presión Constante';
+                document.getElementById('dash-plan-desc').innerHTML = `🌙 <strong>Descanso:</strong> ${cfg.restTime}<br>⚡ <strong>Trabajo:</strong> ${cfg.workTime}<br>🔄 <strong>Alternancia:</strong> Cada ${cfg.pumpAlternateHours}h`;
+            } else {
+                document.getElementById('dash-plan-title').textContent = 'Modelo: Modo Normal (NM)';
+                const diasStr = (cfg.nmDays && cfg.nmDays.length > 0) ? cfg.nmDays.join(', ') : 'Ninguno';
+                document.getElementById('dash-plan-desc').innerHTML = `📅 <strong>Días:</strong> ${diasStr}<br>⏰ <strong>Horario:</strong> ${cfg.nmTime}`;
+            }
+        }
+
+        renderPlanText();
+
+        function formatMin(m) {
+            return String(m).padStart(2, '0');
+        }
+
+        function cargarFormularioRapido() {
+            if (cfg.model === 'presion') {
+                document.getElementById('qe-presion-fields').style.display = 'block';
+                document.getElementById('qe-nm-fields').style.display = 'none';
+
+                document.getElementById('qe-rest-start-h').value = cfg.restStartH || 12;
+                document.getElementById('qe-rest-start-m').value = formatMin(cfg.restStartM || 0);
+                document.getElementById('qe-rest-start-ampm').value = cfg.restStartAmPm || 'AM';
+
+                document.getElementById('qe-rest-end-h').value = cfg.restEndH || 5;
+                document.getElementById('qe-rest-end-m').value = formatMin(cfg.restEndM || 0);
+                document.getElementById('qe-rest-end-ampm').value = cfg.restEndAmPm || 'AM';
+
+                sincronizarHorariosDashboard();
+                document.getElementById('qe-pump-alternate').value = cfg.pumpAlternateHours || 6;
+            } else {
+                document.getElementById('qe-presion-fields').style.display = 'none';
+                document.getElementById('qe-nm-fields').style.display = 'block';
+
+                const diasActuales = cfg.nmDays || ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                document.querySelectorAll('input[name="qe-nm-days"]').forEach(cb => {
+                    cb.checked = diasActuales.includes(cb.value);
+                });
+
+                document.getElementById('qe-nm-start-h').value = cfg.nmStartH || 8;
+                document.getElementById('qe-nm-start-m').value = formatMin(cfg.nmStartM || 0);
+                document.getElementById('qe-nm-start-ampm').value = cfg.nmStartAmPm || 'AM';
+
+                document.getElementById('qe-nm-end-h').value = cfg.nmEndH || 5;
+                document.getElementById('qe-nm-end-m').value = formatMin(cfg.nmEndM || 0);
+                document.getElementById('qe-nm-end-ampm').value = cfg.nmEndAmPm || 'PM';
+            }
+        }
+
+        const quickEditPanel = document.getElementById('quick-edit-panel');
+        document.getElementById('btn-toggle-edit').addEventListener('click', () => {
+            if (quickEditPanel.classList.contains('hidden')) {
+                cargarFormularioRapido();
+                quickEditPanel.classList.remove('hidden');
+            } else {
+                quickEditPanel.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-qe-cancel').addEventListener('click', () => {
+            quickEditPanel.classList.add('hidden');
+        });
+
+        document.getElementById('btn-qe-save').addEventListener('click', () => {
+            if (cfg.model === 'presion') {
+                const altHours = parseInt(document.getElementById('qe-pump-alternate').value);
+                if (!altHours || altHours < 1) {
+                    alert('Introduce un lapso válido de horas (mínimo 1 hora).');
+                    return;
+                }
+                cfg.pumpAlternateHours = altHours;
+
+                cfg.restStartH = parseInt(document.getElementById('qe-rest-start-h').value);
+                cfg.restStartM = parseInt(document.getElementById('qe-rest-start-m').value);
+                cfg.restStartAmPm = document.getElementById('qe-rest-start-ampm').value;
+
+                cfg.restEndH = parseInt(document.getElementById('qe-rest-end-h').value);
+                cfg.restEndM = parseInt(document.getElementById('qe-rest-end-m').value);
+                cfg.restEndAmPm = document.getElementById('qe-rest-end-ampm').value;
+
+                cfg.workStartH = parseInt(document.getElementById('qe-work-start-h').value);
+                cfg.workStartM = parseInt(document.getElementById('qe-work-start-m').value);
+                cfg.workStartAmPm = document.getElementById('qe-work-start-ampm').value;
+
+                cfg.workEndH = parseInt(document.getElementById('qe-work-end-h').value);
+                cfg.workEndM = parseInt(document.getElementById('qe-work-end-m').value);
+                cfg.workEndAmPm = document.getElementById('qe-work-end-ampm').value;
+
+                cfg.restTime = `${cfg.restStartH}:${formatMin(cfg.restStartM)} ${cfg.restStartAmPm} a ${cfg.restEndH}:${formatMin(cfg.restEndM)} ${cfg.restEndAmPm}`;
+                cfg.workTime = `${cfg.workStartH}:${formatMin(cfg.workStartM)} ${cfg.workStartAmPm} a ${cfg.workEndH}:${formatMin(cfg.workEndM)} ${cfg.workEndAmPm}`;
+            } else {
+                const selectedDays = [];
+                document.querySelectorAll('input[name="qe-nm-days"]:checked').forEach(cb => {
+                    selectedDays.push(cb.value);
+                });
+
+                if (selectedDays.length === 0) {
+                    alert('Por favor selecciona al menos un día.');
+                    return;
+                }
+
+                cfg.nmDays = selectedDays;
+                cfg.nmStartH = parseInt(document.getElementById('qe-nm-start-h').value);
+                cfg.nmStartM = parseInt(document.getElementById('qe-nm-start-m').value);
+                cfg.nmStartAmPm = document.getElementById('qe-nm-start-ampm').value;
+
+                cfg.nmEndH = parseInt(document.getElementById('qe-nm-end-h').value);
+                cfg.nmEndM = parseInt(document.getElementById('qe-nm-end-m').value);
+                cfg.nmEndAmPm = document.getElementById('qe-nm-end-ampm').value;
+
+                cfg.nmTime = `${cfg.nmStartH}:${formatMin(cfg.nmStartM)} ${cfg.nmStartAmPm} a ${cfg.nmEndH}:${formatMin(cfg.nmEndM)} ${cfg.nmEndAmPm}`;
+            }
+
+            localStorage.setItem('lu_tank_config', JSON.stringify(cfg));
+            renderPlanText();
+            actualizarCuentaRegresiva();
+            quickEditPanel.classList.add('hidden');
+
+            fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cfg)
+            }).catch(() => {});
+        });
+
+        function toMinutes(h, m, ampm) {
+            let hour = parseInt(h);
+            if (ampm === 'PM' && hour < 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+            return hour * 60 + parseInt(m);
+        }
+
+        const nombresDias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+        function actualizarCuentaRegresiva() {
+            const ahora = new Date();
+            const currentDayIndex = ahora.getDay();
+            const currentMins = ahora.getHours() * 60 + ahora.getMinutes();
+            const currentSecs = ahora.getSeconds();
+
+            let targetMins = 0;
+            let estadoActual = '';
+
+            if (cfg.model === 'presion') {
+                const restStart = toMinutes(cfg.restStartH, cfg.restStartM, cfg.restStartAmPm);
+                const restEnd = toMinutes(cfg.restEndH, cfg.restEndM, cfg.restEndAmPm);
+
+                let enDescanso = false;
+                if (restStart < restEnd) {
+                    enDescanso = (currentMins >= restStart && currentMins < restEnd);
+                } else {
+                    enDescanso = (currentMins >= restStart || currentMins < restEnd);
+                }
+
+                if (enDescanso) {
+                    estadoActual = '🌙 En Descanso. Trabajo en:';
+                    targetMins = restEnd;
+                } else {
+                    estadoActual = '⚡ En Trabajo. Descanso en:';
+                    targetMins = restStart;
+                }
+
+                let diffMins = targetMins - currentMins;
+                if (diffMins < 0) diffMins += 1440;
+
+                const remainingTotalSecs = (diffMins * 60) - currentSecs;
+                const rHours = Math.floor(remainingTotalSecs / 3600);
+                const rMins = Math.floor((remainingTotalSecs % 3600) / 60);
+                const rSecs = remainingTotalSecs % 60;
+
+                document.getElementById('dash-countdown').innerHTML = `${estadoActual} <strong>${rHours}h ${rMins}m ${rSecs}s</strong>`;
+
+            } else {
+                const nmStart = toMinutes(cfg.nmStartH || 8, cfg.nmStartM || 0, cfg.nmStartAmPm || 'AM');
+                const nmEnd = toMinutes(cfg.nmEndH || 5, cfg.nmEndM || 0, cfg.nmEndAmPm || 'PM');
+                const diasHabilitados = cfg.nmDays || [];
+                const hoyNombre = nombresDias[currentDayIndex];
+
+                let hoyTrabaja = diasHabilitados.includes(hoyNombre);
+                let enHorarioHoy = false;
+
+                if (hoyTrabaja) {
+                    if (nmStart < nmEnd) {
+                        enHorarioHoy = (currentMins >= nmStart && currentMins < nmEnd);
+                    } else {
+                        enHorarioHoy = (currentMins >= nmStart || currentMins < nmEnd);
+                    }
+                }
+
+                if (enHorarioHoy) {
+                    let diffMins = nmEnd - currentMins;
+                    if (diffMins < 0) diffMins += 1440;
+                    const remainingTotalSecs = (diffMins * 60) - currentSecs;
+                    const rHours = Math.floor(remainingTotalSecs / 3600);
+                    const rMins = Math.floor((remainingTotalSecs % 3600) / 60);
+                    const rSecs = remainingTotalSecs % 60;
+
+                    document.getElementById('dash-countdown').innerHTML = `⚡ <strong>Modo Normal Activo.</strong> Fin de ciclo en: <strong>${rHours}h ${rMins}m ${rSecs}s</strong>`;
+                } else {
+                    let diasFaltantes = 0;
+                    let targetMins = nmStart;
+                    let encontrado = false;
+
+                    for (let d = 0; d < 7; d++) {
+                        let checkIndex = (currentDayIndex + d) % 7;
+                        let checkNombre = nombresDias[checkIndex];
+                        if (diasHabilitados.includes(checkNombre)) {
+                            if (d === 0 && currentMins < nmStart) {
+                                diasFaltantes = 0;
+                                targetMins = nmStart;
+                                encontrado = true;
+                                break;
+                            } else if (d > 0) {
+                                diasFaltantes = d;
+                                targetMins = nmStart;
+                                encontrado = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!encontrado) {
+                        document.getElementById('dash-countdown').innerHTML = `⏳ <strong>Ningún día configurado para operar.</strong>`;
+                        return;
+                    }
+
+                    let diffMins = (1440 - currentMins) + targetMins + (1440 * (diasFaltantes - 1));
+                    const remainingTotalSecs = (diffMins * 60) - currentSecs;
+                    const rDays = Math.floor(remainingTotalSecs / 86400);
+                    const rHours = Math.floor((remainingTotalSecs % 86400) / 3600);
+                    const rMins = Math.floor((remainingTotalSecs % 3600) / 60);
+                    const rSecs = remainingTotalSecs % 60;
+
+                    let textoDias = rDays > 0 ? `${rDays} días, ` : '';
+                    document.getElementById('dash-countdown').innerHTML = `⏳ <strong>Próximo ciclo NM en:</strong> ${textoDias}${rHours}h ${rMins}m ${rSecs}s`;
+                }
+            }
+        }
+
+        function actualizarDashboardVisual(data) {
+            const porcentaje = Math.min(100, Math.max(0, data.nivel));
+            const litros = data.litros;
+            const capacidadTotal = data.capacidad_total || 1000;
+            const caudal = data.caudal;
+
+            const faltante = Math.max(0, capacidadTotal - litros);
+            const tiempoMinutos = caudal > 0.2 ? Math.ceil(faltante / caudal) : 0;
+
+            document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${data.offset} cm`;
+            document.getElementById('dash-percent').textContent = `${porcentaje.toFixed(1)}%`;
+            document.getElementById('dash-liters').textContent = `${Math.round(litros)} / ${Math.round(capacidadTotal)} L`;
+            document.getElementById('dash-flow').textContent = `${caudal.toFixed(1)} L/min`;
+            document.getElementById('dash-time').textContent = porcentaje >= 98 ? 'Lleno' : (caudal == 0 ? '----' : `${tiempoMinutos} min`);
+
+            const offsetPct = Math.min(50, (data.offset / data.th) * 100);
+            document.getElementById('visual-offset').style.height = `${offsetPct}%`;
+
+            const usableHeight = 100 - offsetPct;
+            document.getElementById('visual-water').style.height = `${(porcentaje / 100) * usableHeight}%`;
+        }
+
+        let manualPump1 = false;
+        let manualPump2 = false;
+
+        function actualizarEstadoRelesWeb() {
+            const r1State = document.getElementById('pump-1-state');
+            const r2State = document.getElementById('pump-2-state');
+            const btnPump1 = document.getElementById('btn-pump-1');
+            const btnPump2 = document.getElementById('btn-pump-2');
+            const btnPumpAll = document.getElementById('btn-pump-all');
+
+            if (manualPump1) {
+                r1State.textContent = 'Manual (ON)';
+                r1State.className = 'pump-status status-trabajo';
+                btnPump1.className = 'btn pump-on';
+                btnPump1.textContent = '🛑 Bomba 1: ON';
+            } else {
+                r1State.textContent = 'En Descanso';
+                r1State.className = 'pump-status status-descanso';
+                btnPump1.className = 'btn pump-off';
+                btnPump1.textContent = '⚡ Bomba 1: OFF';
+            }
+
+            if (manualPump2) {
+                r2State.textContent = 'Manual (ON)';
+                r2State.className = 'pump-status status-trabajo';
+                btnPump2.className = 'btn pump-on';
+                btnPump2.textContent = '🛑 Bomba 2: ON';
+            } else {
+                r2State.textContent = 'En Descanso';
+                r2State.className = 'pump-status status-descanso';
+                btnPump2.className = 'btn pump-off';
+                btnPump2.textContent = '⚡ Bomba 2: OFF';
+            }
+
+            if (manualPump1 && manualPump2) {
+                btnPumpAll.className = 'btn pump-on';
+                btnPumpAll.textContent = '🛑 Apagar Ambas a la Vez';
+            } else {
+                btnPumpAll.className = 'btn pump-off';
+                btnPumpAll.textContent = '⚡ Encender Ambas a la Vez';
+            }
+        }
+
+        const btnPump1 = document.getElementById('btn-pump-1');
+        const btnPump2 = document.getElementById('btn-pump-2');
+        const btnPumpAll = document.getElementById('btn-pump-all');
+
+        btnPump1.addEventListener('click', () => {
+            manualPump1 = !manualPump1;
+            actualizarEstadoRelesWeb();
+            // Envía por MQTT a la nube y también hace fetch local por si acaso
+            enviarComandoRemoto("lu/tank/set", { pump1: manualPump1 });
+            fetch(`/pump1?state=${manualPump1 ? '1' : '0'}`).catch(() => {});
+        });
+
+        btnPump2.addEventListener('click', () => {
+            manualPump2 = !manualPump2;
+            actualizarEstadoRelesWeb();
+            enviarComandoRemoto("lu/tank/set", { pump2: manualPump2 });
+            fetch(`/pump2?state=${manualPump2 ? '1' : '0'}`).catch(() => {});
+        });
+
+        btnPumpAll.addEventListener('click', () => {
+            const estadoGlobal = !(manualPump1 && manualPump2);
+            manualPump1 = estadoGlobal;
+            manualPump2 = estadoGlobal;
+            actualizarEstadoRelesWeb();
+            enviarComandoRemoto("lu/tank/set", { pumpAll: estadoGlobal });
+            fetch(`/pumpAll?state=${estadoGlobal ? '1' : '0'}`).catch(() => {});
+        });
+
+        // Petición local de respaldo (funciona cuando estás en casa conectado por IP)
+        function fetchESP32Status() {
+            fetch('/status')
+                .then(res => res.json())
+                .then(data => {
+                    // Si MQTT no está conectado por estar en red local pura, usa el fetch local
+                    if (!client.isConnected()) {
+                        manualPump1 = (data.pump1 === 1);
+                        manualPump2 = (data.pump2 === 1);
+                        actualizarEstadoRelesWeb();
+                        actualizarDashboardVisual(data);
+                    }
+                })
+                .catch(() => {});
+        }
+
+        setInterval(() => {
+            fetchESP32Status();
+            actualizarCuentaRegresiva();
+        }, 500);
+
+        fetchESP32Status();
+        actualizarCuentaRegresiva();
+        actualizarEstadoRelesWeb();
+
+        document.getElementById('btn-back').addEventListener('click', function() {
+            const confirmar = confirm("¡ADVERTENCIA DE SEGURIDAD!\n\nSi vuelves a la configuración perderás la sesión actual. Introducir parámetros geométricos o de presión incorrectos podría dañar el sistema o hacer trabajar la bomba en seco.\n\n¿Estás seguro de que deseas continuar?");
+            if (confirmar) {
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>

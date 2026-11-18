@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L&U Controller - Configuración</title>
+    <!-- Librería MQTT para JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --card-inner: #334155;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --border-color: #475569;
+            --warning-color: #f59e0b;
+            --success-color: #10b981;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 440px; }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        h2 { margin: 0 0 6px 0; text-align: center; font-size: 1.5rem; }
+        .subtitle { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
+        .form-group { margin-bottom: 15px; }
+
+        label {
+            display: block;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-color);
+        }
+
+        .hint { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; }
+
+        select, input {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-inner);
+            color: var(--text-color);
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        .hidden { display: none !important; }
+
+        .tank-params-group {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px dashed var(--border-color);
+            margin-bottom: 15px;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .day-checkbox-label {
+            background: var(--card-inner);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            margin-bottom: 0 !important;
+        }
+        .day-checkbox-label input {
+            width: auto;
+            margin: 0;
+            accent-color: var(--accent-color);
+        }
+
+        .btn-submit {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-submit:hover { background-color: var(--accent-hover); }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 10px;
+            margin-top: 8px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-secondary:hover { color: var(--text-color); border-color: var(--text-color); }
+        .footer-note { text-align: center; margin-top: 16px; font-size: 0.75rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h2>L&amp;U Controller</h2>
+            <div class="subtitle">Configuración Geométrica y Operativa</div>
+
+            <form id="config-form">
+                <div class="form-group">
+                    <label for="model">Modelo de Control:</label>
+                    <select id="model" name="model">
+                        <option value="presion" selected>Presión Constante (Con Descanso Programado)</option>
+                        <option value="nm">Modo Normal / NM (Demanda / Horarios)</option>
+                    </select>
+                </div>
+
+                <!-- HORARIOS DE PRESIÓN CONSTANTE -->
+                <div id="presion-schedule-group" class="form-group" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px;">
+                    <label style="margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">Gestión de Horarios:</label>
+                    
+                    <label style="font-size: 0.75rem; color: var(--warning-color); margin-bottom: 4px; font-weight: bold;">🌙 HORARIO DE DESCANSO (Bomba Bloqueada)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO DESCANSO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="rest-start-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12" selected>12</option></select>
+                                <select id="rest-start-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="rest-start-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
+                            </div>
+                        </div>
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN DESCANSO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="rest-end-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
+                                <select id="rest-end-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="rest-end-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label style="font-size: 0.75rem; color: var(--success-color); margin-bottom: 4px; font-weight: bold;">⚡ HORARIO DE TRABAJO (Calculado Automáticamente)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO TRABAJO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="work-start-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="5" selected>5</option></select>
+                                <select id="work-start-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="00" selected>00</option></select>
+                                <select id="work-start-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="AM" selected>AM</option></select>
+                            </div>
+                        </div>
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN TRABAJO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="work-end-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="12" selected>12</option></select>
+                                <select id="work-end-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="00" selected>00</option></select>
+                                <select id="work-end-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="PM" selected>PM</option></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="pump-alternate-hours" style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 2px;">🔄 LAPSO PARA ALTERNAR BOMBAS (HORAS):</label>
+                        <input type="number" min="1" max="168" id="pump-alternate-hours" value="6" style="padding: 6px; font-size: 0.85rem;" required>
+                    </div>
+                </div>
+
+                <!-- MODO NORMAL / NM -->
+                <div id="nm-schedule-group" class="form-group hidden" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px;">
+                    <label style="margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">Gestión Modo Normal (NM):</label>
+                    
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Días de Operación (Selección Múltiple):</label>
+                        <div class="days-grid">
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Lunes" checked> Lunes</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Martes" checked> Martes</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Miércoles" checked> Miércoles</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Jueves" checked> Jueves</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Viernes" checked> Viernes</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Sábado" checked> Sábado</label>
+                            <label class="day-checkbox-label"><input type="checkbox" name="nm-days" value="Domingo" checked> Domingo</label>
+                        </div>
+                    </div>
+
+                    <label style="font-size: 0.75rem; color: var(--success-color); margin-bottom: 4px; font-weight: bold;">⏰ HORAS DE TRABAJO (Ajustables)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO TRABAJO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="nm-start-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
+                                <select id="nm-start-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="nm-start-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
+                            </div>
+                        </div>
+                        <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                            <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN TRABAJO</span>
+                            <div style="display: flex; gap: 2px;">
+                                <select id="nm-end-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
+                                <select id="nm-end-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="nm-end-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM">AM</option><option value="PM" selected>PM</option></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tipo de Estanque -->
+                <div class="form-group">
+                    <label for="tank">Tipo de Estanque / Tanque:</label>
+                    <select id="tank" name="tank">
+                        <option value="cilindrico" selected>Cilíndrico</option>
+                        <option value="cuadrado">Cuadrado</option>
+                        <option value="rectangular">Rectangular</option>
+                        <option value="cono">Cono Invertido</option>
+                    </select>
+                </div>
+
+                <!-- VARIABLES ÚNICAS -->
+                <div id="block-cilindrico" class="tank-params-group">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="radio_cilindro">Radio del Cilindro (cm):</label>
+                        <input type="number" step="0.01" min="0.1" id="radio_cilindro" value="30.25">
+                    </div>
+                </div>
+
+                <div id="block-cuadrado" class="tank-params-group hidden">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="lado_cuadrado">Ancho / Lado del Cuadrado (cm):</label>
+                        <input type="number" step="0.01" min="0.1" id="lado_cuadrado" value="50.00">
+                    </div>
+                </div>
+
+                <div id="block-rectangular" class="tank-params-group hidden">
+                    <div class="form-group"><label for="ancho_rect">Ancho del Rectángulo (cm):</label><input type="number" step="0.01" min="0.1" id="ancho_rect" value="40.00"></div>
+                    <div class="form-group" style="margin-bottom:0;"><label for="largo_rect">Largo del Rectángulo (cm):</label><input type="number" step="0.01" min="0.1" id="largo_rect" value="60.00"></div>
+                </div>
+
+                <div id="block-cono" class="tank-params-group hidden">
+                    <div class="form-group"><label for="radio_inf_cono">Radio Inferior / Suelo (cm):</label><input type="number" step="0.01" min="0.1" id="radio_inf_cono" value="20.00"></div>
+                    <div class="form-group" style="margin-bottom:0;"><label for="radio_sup_cono">Radio Superior / Tope (cm):</label><input type="number" step="0.01" min="0.1" id="radio_sup_cono" value="45.00"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="th">Altura Total del Estanque (cm):</label>
+                    <input type="number" step="0.01" min="1" id="th" value="190.0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="offset">Offset / Zona Muerta (cm): <span class="hint">(Borde superior hasta boya)</span></label>
+                    <input type="number" step="0.01" min="0" id="offset" value="20.0" required>
+                </div>
+
+                <button type="submit" id="btn-save-cfg" class="btn-submit">Guardar y Abrir Dashboard </button>
+            </form>
+
+            <button type="button" class="btn-secondary" onclick="window.location.href='wifi.html'">
+                📡 Ir a Gestión de Red 
+            </button>
+        </div>
+        <div class="footer-note">L&amp;U Engineering</div>
+    </div>
+
+    <script>
+        // Configuración MQTT Web para respaldo remoto
+        const mqtt_host = "de96f323.ala.us-east-1.emqxsl.com";
+        const mqtt_port = 8084;
+        const mqtt_user = "Admin";
+        const mqtt_pass = "Admin";
+        let clientId = "WebClient_Cfg_" + Math.random().toString(16).substring(2, 8);
+        let client = new Paho.MQTT.Client(mqtt_host, Number(mqtt_port), "/mqtt", clientId);
+
+        client.onConnectionLost = function(responseObject) {
+            if (responseObject.errorCode !== 0) console.log("MQTT Conexión perdida");
+        };
+
+        client.connect({
+            timeout: 3,
+            useSSL: true,
+            userName: mqtt_user,
+            password: mqtt_pass,
+            onSuccess: function() { console.log("MQTT Conectado en Index"); },
+            onFailure: function() { console.log("Fallo MQTT en Index"); }
+        });
+
+        const tankSelect = document.getElementById('tank');
+        const modelSelect = document.getElementById('model');
+        const presionScheduleGroup = document.getElementById('presion-schedule-group');
+        const nmScheduleGroup = document.getElementById('nm-schedule-group');
+
+        const blockCilindrico = document.getElementById('block-cilindrico');
+        const blockCuadrado = document.getElementById('block-cuadrado');
+        const blockRectangular = document.getElementById('block-rectangular');
+        const blockCono = document.getElementById('block-cono');
+
+        function sincronizarHorarios() {
+            const restEndH = document.getElementById('rest-end-h').value;
+            const restEndM = document.getElementById('rest-end-m').value;
+            const restEndAmPm = document.getElementById('rest-end-ampm').value;
+
+            const restStartH = document.getElementById('rest-start-h').value;
+            const restStartM = document.getElementById('rest-start-m').value;
+            const restStartAmPm = document.getElementById('rest-start-ampm').value;
+
+            document.getElementById('work-start-h').innerHTML = `<option value="${restEndH}" selected>${restEndH}</option>`;
+            document.getElementById('work-start-m').innerHTML = `<option value="${restEndM}" selected>${restEndM}</option>`;
+            document.getElementById('work-start-ampm').innerHTML = `<option value="${restEndAmPm}" selected>${restEndAmPm}</option>`;
+
+            document.getElementById('work-end-h').innerHTML = `<option value="${restStartH}" selected>${restStartH}</option>`;
+            document.getElementById('work-end-m').innerHTML = `<option value="${restStartM}" selected>${restStartM}</option>`;
+            document.getElementById('work-end-ampm').innerHTML = `<option value="${restStartAmPm}" selected>${restStartAmPm}</option>`;
+        }
+
+        ['rest-start-h', 'rest-start-m', 'rest-start-ampm', 'rest-end-h', 'rest-end-m', 'rest-end-ampm'].forEach(id => {
+            document.getElementById(id).addEventListener('change', sincronizarHorarios);
+        });
+
+        function updateTankBlocks() {
+            const type = tankSelect.value;
+            blockCilindrico.classList.add('hidden');
+            blockCuadrado.classList.add('hidden');
+            blockRectangular.classList.add('hidden');
+            blockCono.classList.add('hidden');
+
+            if (type === 'cilindrico') blockCilindrico.classList.remove('hidden');
+            else if (type === 'cuadrado') blockCuadrado.classList.remove('hidden');
+            else if (type === 'rectangular') blockRectangular.classList.remove('hidden');
+            else if (type === 'cono') blockCono.classList.remove('hidden');
+        }
+
+        function updateModelFields() {
+            if (modelSelect.value === 'presion') {
+                presionScheduleGroup.classList.remove('hidden');
+                nmScheduleGroup.classList.add('hidden');
+            } else {
+                presionScheduleGroup.classList.add('hidden');
+                nmScheduleGroup.classList.remove('hidden');
+            }
+        }
+
+        tankSelect.addEventListener('change', updateTankBlocks);
+        modelSelect.addEventListener('change', updateModelFields);
+
+        // Cargar configuración de red local o desde memoria local si no hay conexión local
+        fetch('/status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.tank) {
+                    tankSelect.value = data.tank;
+                    if (data.th) document.getElementById('th').value = data.th;
+                    if (data.offset !== undefined) document.getElementById('offset').value = data.offset;
+                    updateTankBlocks();
+                }
+            }).catch(() => {
+                // Si falla porque estamos fuera de casa, lee la última configuración guardada
+                const localCfg = localStorage.getItem('lu_tank_config');
+                if (localCfg) {
+                    let c = JSON.parse(localCfg);
+                    if (c.tank) tankSelect.value = c.tank;
+                    if (c.th) document.getElementById('th').value = c.th;
+                    if (c.offset !== undefined) document.getElementById('offset').value = c.offset;
+                    updateTankBlocks();
+                }
+            });
+
+        document.getElementById('config-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const th = parseFloat(document.getElementById('th').value);
+            const offset = parseFloat(document.getElementById('offset').value);
+
+            if (offset >= th) {
+                alert('Error: El Offset (zona muerta) debe ser menor que la Altura Total del estanque.');
+                return;
+            }
+
+            const selectedDays = [];
+            document.querySelectorAll('input[name="nm-days"]:checked').forEach(cb => {
+                selectedDays.push(cb.value);
+            });
+
+            if (modelSelect.value === 'nm' && selectedDays.length === 0) {
+                alert('Por favor selecciona al menos un día para el Modo Normal (NM).');
+                return;
+            }
+
+            const tankType = tankSelect.value;
+            let rCil = 0, lCuad = 0, aRect = 0, lRect = 0, rInf = 0, rSup = 0;
+
+            if (tankType === 'cilindrico') {
+                rCil = parseFloat(document.getElementById('radio_cilindro').value) || 0;
+            } else if (tankType === 'cuadrado') {
+                lCuad = parseFloat(document.getElementById('lado_cuadrado').value) || 0;
+            } else if (tankType === 'rectangular') {
+                aRect = parseFloat(document.getElementById('ancho_rect').value) || 0;
+                lRect = parseFloat(document.getElementById('largo_rect').value) || 0;
+            } else if (tankType === 'cono') {
+                rInf = parseFloat(document.getElementById('radio_inf_cono').value) || 0;
+                rSup = parseFloat(document.getElementById('radio_sup_cono').value) || 0;
+            }
+
+            const configData = {
+                model: modelSelect.value,
+                restStartH: parseInt(document.getElementById('rest-start-h').value),
+                restStartM: parseInt(document.getElementById('rest-start-m').value),
+                restStartAmPm: document.getElementById('rest-start-ampm').value,
+                restEndH: parseInt(document.getElementById('rest-end-h').value),
+                restEndM: parseInt(document.getElementById('rest-end-m').value),
+                restEndAmPm: document.getElementById('rest-end-ampm').value,
+                
+                workStartH: parseInt(document.getElementById('work-start-h').value),
+                workStartM: parseInt(document.getElementById('work-start-m').value),
+                workStartAmPm: document.getElementById('work-start-ampm').value,
+                workEndH: parseInt(document.getElementById('work-end-h').value),
+                workEndM: parseInt(document.getElementById('work-end-m').value),
+                workEndAmPm: document.getElementById('work-end-ampm').value,
+
+                restTime: `${document.getElementById('rest-start-h').value}:${document.getElementById('rest-start-m').value} ${document.getElementById('rest-start-ampm').value} a ${document.getElementById('rest-end-h').value}:${document.getElementById('rest-end-m').value} ${document.getElementById('rest-end-ampm').value}`,
+                workTime: `${document.getElementById('work-start-h').value}:${document.getElementById('work-start-m').value} ${document.getElementById('work-start-ampm').value} a ${document.getElementById('work-end-h').value}:${document.getElementById('work-end-m').value} ${document.getElementById('work-end-ampm').value}`,
+                
+                pumpAlternateHours: parseInt(document.getElementById('pump-alternate-hours').value) || 6,
+
+                nmDays: selectedDays,
+                nmStartH: parseInt(document.getElementById('nm-start-h').value),
+                nmStartM: parseInt(document.getElementById('nm-start-m').value),
+                nmStartAmPm: document.getElementById('nm-start-ampm').value,
+                nmEndH: parseInt(document.getElementById('nm-end-h').value),
+                nmEndM: parseInt(document.getElementById('nm-end-m').value),
+                nmEndAmPm: document.getElementById('nm-end-ampm').value,
+                nmTime: `${document.getElementById('nm-start-h').value}:${document.getElementById('nm-start-m').value} ${document.getElementById('nm-start-ampm').value} a ${document.getElementById('nm-end-h').value}:${document.getElementById('nm-end-m').value} ${document.getElementById('nm-end-ampm').value}`,
+
+                tank: tankType,
+                th: th,
+                offset: offset,
+                radio_cilindro: rCil,
+                lado_cuadrado: lCuad,
+                ancho_rect: aRect,
+                largo_rect: lRect,
+                radio_inf_cono: rInf,
+                radio_sup_cono: rSup
+            };
+
+            localStorage.setItem('lu_tank_config', JSON.stringify(configData));
+
+            // Si está conectado por MQTT en la nube, publica la configuración o envía por fetch local
+            if (client && client.isConnected()) {
+                let message = new Paho.MQTT.Message(JSON.stringify(configData));
+                message.destinationName = "lu/tank/set";
+                client.send(message);
+            }
+
+            fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configData)
+            }).finally(() => {
+                window.location.href = 'dashboard.html';
+            });
+        });
+
+        updateTankBlocks();
+        updateModelFields();
+        sincronizarHorarios();
+    </script>
+</body>
+</html>
