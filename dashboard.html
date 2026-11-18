@@ -430,7 +430,7 @@
         client.onConnectionLost = function(responseObject) {
             if (responseObject.errorCode !== 0) {
                 console.log("Conexión MQTT perdida: " + responseObject.errorMessage);
-                setTimeout(conectarMQTT, 5000); // Reintentar conexión automática
+                setTimeout(conectarMQTT, 5000);
             }
         };
 
@@ -450,7 +450,7 @@
             let options = {
                 invocationContext: {host: mqtt_host, port: Number(mqtt_port), clientId: clientId},
                 timeout: 3,
-                useSSL: true, // Obligatorio para el puerto 8084
+                useSSL: true,
                 userName: mqtt_user,
                 password: mqtt_pass,
                 onSuccess: function() {
@@ -465,12 +465,9 @@
             client.connect(options);
         }
 
-        // Iniciar conexión MQTT en segundo plano
         conectarMQTT();
 
-        // Función auxiliar para publicar comandos a la nube o por red local
         function enviarComandoRemoto(topic, payloadObj) {
-            // 1. Intentar enviar por MQTT si está conectado
             if (client && client.isConnected()) {
                 let message = new Paho.MQTT.Message(JSON.stringify(payloadObj));
                 message.destinationName = topic;
@@ -479,7 +476,7 @@
         }
 
         // ==========================================
-        // LÓGICA ORIGINAL DE LA PÁGINA
+        // LÓGICA DE LA PÁGINA
         // ==========================================
         const rawConfig = localStorage.getItem('lu_tank_config');
         
@@ -787,22 +784,29 @@
             }
         }
 
+        // CORREGIDO: Lectura dinámica de capacidad_total y offset enviados por el ESP32
         function actualizarDashboardVisual(data) {
             const porcentaje = Math.min(100, Math.max(0, data.nivel));
             const litros = data.litros;
-            const capacidadTotal = data.capacidad_total || 1000;
+            const capacidadTotal = data.capacidad_total || 488; // Lee el valor real del ESP32
             const caudal = data.caudal;
 
             const faltante = Math.max(0, capacidadTotal - litros);
             const tiempoMinutos = caudal > 0.2 ? Math.ceil(faltante / caudal) : 0;
 
-            document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${data.offset} cm`;
+            const offsetVal = data.offset !== undefined ? data.offset : 20;
+            const thVal = data.th || 190;
+
+            document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${offsetVal} cm`;
             document.getElementById('dash-percent').textContent = `${porcentaje.toFixed(1)}%`;
+            
+            // CORREGIDO: Muestra el total de litros real enviado por el ESP32 en lugar del estático 1000L
             document.getElementById('dash-liters').textContent = `${Math.round(litros)} / ${Math.round(capacidadTotal)} L`;
+            
             document.getElementById('dash-flow').textContent = `${caudal.toFixed(1)} L/min`;
             document.getElementById('dash-time').textContent = porcentaje >= 98 ? 'Lleno' : (caudal == 0 ? '----' : `${tiempoMinutos} min`);
 
-            const offsetPct = Math.min(50, (data.offset / data.th) * 100);
+            const offsetPct = Math.min(50, (offsetVal / thVal) * 100);
             document.getElementById('visual-offset').style.height = `${offsetPct}%`;
 
             const usableHeight = 100 - offsetPct;
@@ -859,7 +863,6 @@
         btnPump1.addEventListener('click', () => {
             manualPump1 = !manualPump1;
             actualizarEstadoRelesWeb();
-            // Envía por MQTT a la nube y también hace fetch local por si acaso
             enviarComandoRemoto("lu/tank/set", { pump1: manualPump1 });
             fetch(`/pump1?state=${manualPump1 ? '1' : '0'}`).catch(() => {});
         });
@@ -880,18 +883,16 @@
             fetch(`/pumpAll?state=${estadoGlobal ? '1' : '0'}`).catch(() => {});
         });
 
-        // Petición local de respaldo (funciona cuando estás en casa conectado por IP)
         function fetchESP32Status() {
             fetch('/status')
                 .then(res => res.json())
                 .then(data => {
-                    // Si MQTT no está conectado por estar en red local pura, usa el fetch local
                     if (!client.isConnected()) {
                         manualPump1 = (data.pump1 === 1);
                         manualPump2 = (data.pump2 === 1);
                         actualizarEstadoRelesWeb();
-                        actualizarDashboardVisual(data);
                     }
+                    actualizarDashboardVisual(data);
                 })
                 .catch(() => {});
         }
