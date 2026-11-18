@@ -420,7 +420,7 @@
         // CONFIGURACIÓN MQTT WEB (EMQX CLOUD WSS)
         // ==========================================
         const mqtt_host = "de96f323.ala.us-east-1.emqxsl.com";
-        const mqtt_port = 8084; // Puerto WebSocket seguro (WSS)
+        const mqtt_port = 8084;
         const mqtt_user = "Admin"; 
         const mqtt_pass = "Admin"; 
         
@@ -784,14 +784,16 @@
             }
         }
 
-        // CORREGIDO: Lectura dinámica de capacidad_total y offset enviados por el ESP32
+        // FUNCIÓN CORREGIDA: Cálculo seguro de litros reales basados en el porcentaje
         function actualizarDashboardVisual(data) {
             const porcentaje = Math.min(100, Math.max(0, data.nivel));
-            const litros = data.litros;
-            const capacidadTotal = data.capacidad_total || 488; // Lee el valor real del ESP32
+            const capacidadTotal = data.capacidad_total || 488;
+            
+            // Cálculo seguro de litros actuales en función del porcentaje y la capacidad total
+            const litrosReales = (porcentaje / 100.0) * capacidadTotal;
+            
             const caudal = data.caudal;
-
-            const faltante = Math.max(0, capacidadTotal - litros);
+            const faltante = Math.max(0, capacidadTotal - litrosReales);
             const tiempoMinutos = caudal > 0.2 ? Math.ceil(faltante / caudal) : 0;
 
             const offsetVal = data.offset !== undefined ? data.offset : 20;
@@ -800,8 +802,8 @@
             document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${offsetVal} cm`;
             document.getElementById('dash-percent').textContent = `${porcentaje.toFixed(1)}%`;
             
-            // CORREGIDO: Muestra el total de litros real enviado por el ESP32 en lugar del estático 1000L
-            document.getElementById('dash-liters').textContent = `${Math.round(litros)} / ${Math.round(capacidadTotal)} L`;
+            // Mostrar los litros calculados correctamente
+            document.getElementById('dash-liters').textContent = `${Math.round(litrosReales)} / ${Math.round(capacidadTotal)} L`;
             
             document.getElementById('dash-flow').textContent = `${caudal.toFixed(1)} L/min`;
             document.getElementById('dash-time').textContent = porcentaje >= 98 ? 'Lleno' : (caudal == 0 ? '----' : `${tiempoMinutos} min`);
