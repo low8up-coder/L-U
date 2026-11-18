@@ -496,12 +496,7 @@
             tank: 'cilindrico',
             th: 190,
             offset: 20,
-            radio_cilindro: 30.25,
-            lado_cuadrado: 50,
-            ancho_rect: 40,
-            largo_rect: 60,
-            radio_inf_cono: 20,
-            radio_sup_cono: 45
+            capacidad_total: 488
         };
 
         ['qe-rest-start-h', 'qe-rest-end-h', 'qe-work-start-h', 'qe-work-end-h', 'qe-nm-start-h', 'qe-nm-end-h'].forEach(id => {
@@ -784,25 +779,35 @@
             }
         }
 
-        // FUNCIÓN CORREGIDA: Cálculo seguro de litros reales basados en el porcentaje
+        // ==========================================
+        // SINCRONIZACIÓN ABSOLUTA CON EL ESP32
+        // ==========================================
         function actualizarDashboardVisual(data) {
             const porcentaje = Math.min(100, Math.max(0, data.nivel));
-            const capacidadTotal = data.capacidad_total || 488;
             
-            // Cálculo seguro de litros actuales en función del porcentaje y la capacidad total
-            const litrosReales = (porcentaje / 100.0) * capacidadTotal;
+            // Prioriza siempre el cálculo de capacidad oficial que manda el ESP32
+            const capacidadTotal = data.capacidad_total !== undefined ? data.capacidad_total : (cfg.capacidad_total || 488);
+            const litrosReales = data.litros !== undefined ? data.litros : (porcentaje / 100.0) * capacidadTotal;
             
-            const caudal = data.caudal;
+            const caudal = data.caudal !== undefined ? data.caudal : 0.0;
             const faltante = Math.max(0, capacidadTotal - litrosReales);
             const tiempoMinutos = caudal > 0.2 ? Math.ceil(faltante / caudal) : 0;
 
-            const offsetVal = data.offset !== undefined ? data.offset : 20;
-            const thVal = data.th || 190;
+            const offsetVal = data.offset !== undefined ? data.offset : (cfg.offset || 20);
+            const thVal = data.th !== undefined ? data.th : (cfg.th || 190);
+            const tankType = data.tank !== undefined ? data.tank : (cfg.tank || 'cilindrico');
 
-            document.getElementById('dash-tank-type').textContent = `${tankNames[data.tank] || 'Estanque'} • Offset: ${offsetVal} cm`;
+            // Actualiza memoria local para mantener consistencia
+            cfg.capacidad_total = capacidadTotal;
+            cfg.offset = offsetVal;
+            cfg.th = thVal;
+            cfg.tank = tankType;
+            localStorage.setItem('lu_tank_config', JSON.stringify(cfg));
+
+            document.getElementById('dash-tank-type').textContent = `${tankNames[tankType] || 'Estanque'} • Offset: ${offsetVal} cm`;
             document.getElementById('dash-percent').textContent = `${porcentaje.toFixed(1)}%`;
             
-            // Mostrar los litros calculados correctamente
+            // Refleja exactamente el cálculo oficial del ESP32 en ambas pantallas por igual
             document.getElementById('dash-liters').textContent = `${Math.round(litrosReales)} / ${Math.round(capacidadTotal)} L`;
             
             document.getElementById('dash-flow').textContent = `${caudal.toFixed(1)} L/min`;
@@ -889,11 +894,9 @@
             fetch('/status')
                 .then(res => res.json())
                 .then(data => {
-                    if (!client.isConnected()) {
-                        manualPump1 = (data.pump1 === 1);
-                        manualPump2 = (data.pump2 === 1);
-                        actualizarEstadoRelesWeb();
-                    }
+                    manualPump1 = (data.pump1 === 1);
+                    manualPump2 = (data.pump2 === 1);
+                    actualizarEstadoRelesWeb();
                     actualizarDashboardVisual(data);
                 })
                 .catch(() => {});
