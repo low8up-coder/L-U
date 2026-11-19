@@ -449,6 +449,7 @@
                     manualPump1 = (data.pump1 === 1);
                     manualPump2 = (data.pump2 === 1);
                     actualizarEstadoRelesWeb();
+                    sincronizarPlanDesdeESP32(data);
                     actualizarDashboardVisual(data);
                 } catch(e) {}
             }
@@ -550,6 +551,74 @@
             'rectangular': 'Tanque Rectangular',
             'cono': 'Tanque Cono Invertido'
         };
+
+        function parseHoraTexto(texto) {
+            const match = texto ? texto.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i) : null;
+            if (!match) return null;
+            return { h: parseInt(match[1], 10), m: parseInt(match[2], 10), ampm: match[3].toUpperCase() };
+        }
+
+        function sincronizarPlanDesdeESP32(data) {
+            if (!data) return;
+            let cambiado = false;
+
+            if (data.model && data.model !== cfg.model) {
+                cfg.model = data.model;
+                cambiado = true;
+            }
+            if (data.restTime && data.restTime !== cfg.restTime) {
+                cfg.restTime = data.restTime;
+                const p = parseHoraTexto(data.restTime);
+                if (p) { cfg.restStartH = p.h; cfg.restStartM = p.m; cfg.restStartAmPm = p.ampm; }
+                const partes = data.restTime.split(' a ');
+                if (partes.length === 2) {
+                    const pFin = parseHoraTexto(partes[1]);
+                    if (pFin) { cfg.restEndH = pFin.h; cfg.restEndM = pFin.m; cfg.restEndAmPm = pFin.ampm; }
+                }
+                cambiado = true;
+            }
+            if (data.workTime && data.workTime !== cfg.workTime) {
+                cfg.workTime = data.workTime;
+                const partesW = data.workTime.split(' a ');
+                if (partesW.length === 2) {
+                    const pIni = parseHoraTexto(partesW[0]);
+                    const pFin = parseHoraTexto(partesW[1]);
+                    if (pIni) { cfg.workStartH = pIni.h; cfg.workStartM = pIni.m; cfg.workStartAmPm = pIni.ampm; }
+                    if (pFin) { cfg.workEndH = pFin.h; cfg.workEndM = pFin.m; cfg.workEndAmPm = pFin.ampm; }
+                }
+                cambiado = true;
+            }
+            if (data.pumpAlternateHours !== undefined && Number(data.pumpAlternateHours) !== Number(cfg.pumpAlternateHours)) {
+                cfg.pumpAlternateHours = Number(data.pumpAlternateHours);
+                cambiado = true;
+            }
+            if (data.nmDays !== undefined) {
+                const arrDias = Array.isArray(data.nmDays)
+                    ? data.nmDays
+                    : String(data.nmDays).split(',').map(s => s.trim()).filter(Boolean);
+                if (JSON.stringify(arrDias) !== JSON.stringify(cfg.nmDays)) {
+                    cfg.nmDays = arrDias;
+                    cambiado = true;
+                }
+            }
+            if (data.nmTime && data.nmTime !== cfg.nmTime) {
+                cfg.nmTime = data.nmTime;
+                const partesN = data.nmTime.split(' a ');
+                if (partesN.length === 2) {
+                    const pIni = parseHoraTexto(partesN[0]);
+                    const pFin = parseHoraTexto(partesN[1]);
+                    if (pIni) { cfg.nmStartH = pIni.h; cfg.nmStartM = pIni.m; cfg.nmStartAmPm = pIni.ampm; }
+                    if (pFin) { cfg.nmEndH = pFin.h; cfg.nmEndM = pFin.m; cfg.nmEndAmPm = pFin.ampm; }
+                }
+                cambiado = true;
+            }
+
+            if (cambiado) {
+                localStorage.setItem('lu_tank_config', JSON.stringify(cfg));
+                renderPlanText();
+                actualizarCuentaRegresiva();
+            }
+        }
 
         function renderPlanText() {
             if (cfg.model === 'presion') {
@@ -684,7 +753,6 @@
             actualizarCuentaRegresiva();
             quickEditPanel.classList.add('hidden');
 
-            // Envía el plan por MQTT y también por HTTP local si está disponible
             enviarComandoRemoto("lu/tank/set", { plan: cfg });
 
             fetch('/config', {
@@ -912,6 +980,7 @@
                         manualPump2 = (data.pump2 === 1);
                         actualizarEstadoRelesWeb();
                     }
+                    sincronizarPlanDesdeESP32(data);
                     actualizarDashboardVisual(data);
                 })
                 .catch(() => {});
