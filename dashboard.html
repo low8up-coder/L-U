@@ -433,7 +433,8 @@
 
         client.onConnectionLost = function(responseObject) {
             if (responseObject.errorCode !== 0) {
-                setTimeout(conectarMQTT, 5000);
+                console.warn("MQTT desconectado:", responseObject.errorMessage);
+                setTimeout(conectarMQTT, 4000);
             }
         };
 
@@ -446,22 +447,26 @@
                     actualizarEstadoRelesWeb();
                     sincronizarPlanDesdeESP32(data);
                     actualizarDashboardVisual(data);
-                } catch(e) {}
+                } catch(e) {
+                    console.error("Error parseando telemetria MQTT:", e);
+                }
             }
         };
 
         function conectarMQTT() {
             let options = {
                 invocationContext: {host: mqtt_host, port: Number(mqtt_port), clientId: clientId},
-                timeout: 3,
+                timeout: 5,
                 useSSL: true,
                 userName: mqtt_user,
                 password: mqtt_pass,
                 onSuccess: function() {
+                    console.log("Conectado a EMQX Cloud WSS");
                     client.subscribe("lu/tank/telemetry");
                 },
                 onFailure: function(message) {
-                    setTimeout(conectarMQTT, 5000);
+                    console.warn("Fallo conexion MQTT WSS:", message.errorMessage);
+                    setTimeout(conectarMQTT, 4000);
                 }
             };
             client.connect(options);
