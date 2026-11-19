@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>L&U Monitor - Dashboard</title>
-    <!-- Librería MQTT para JavaScript (Permite conectar el navegador a EMQX Cloud vía WebSockets) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root {
@@ -424,11 +423,8 @@
     </div>
 
     <script>
-        // ==========================================
-        // CONFIGURACIÓN MQTT WEB (EMQX CLOUD WSS)
-        // ==========================================
         const mqtt_host = "de96f323.ala.us-east-1.emqxsl.com";
-        const mqtt_port = 8084; // Puerto WebSocket seguro (WSS)
+        const mqtt_port = 8084;
         const mqtt_user = "Admin"; 
         const mqtt_pass = "Admin"; 
         
@@ -437,7 +433,6 @@
 
         client.onConnectionLost = function(responseObject) {
             if (responseObject.errorCode !== 0) {
-                console.log("Conexión MQTT perdida: " + responseObject.errorMessage);
                 setTimeout(conectarMQTT, 5000);
             }
         };
@@ -463,11 +458,9 @@
                 userName: mqtt_user,
                 password: mqtt_pass,
                 onSuccess: function() {
-                    console.log("Conectado a EMQX Cloud vía WebSocket");
                     client.subscribe("lu/tank/telemetry");
                 },
                 onFailure: function(message) {
-                    console.log("Fallo al conectar MQTT: " + message.errorMessage);
                     setTimeout(conectarMQTT, 5000);
                 }
             };
@@ -484,9 +477,6 @@
             }
         }
 
-        // ==========================================
-        // LÓGICA DE LA PÁGINA
-        // ==========================================
         const rawConfig = localStorage.getItem('lu_tank_config');
         
         let cfg = rawConfig ? JSON.parse(rawConfig) : {
@@ -594,9 +584,10 @@
             }
             if (data.nmDays !== undefined) {
                 const arrDias = Array.isArray(data.nmDays)
-                    ? data.nmDays
+                    ? data.nmDays.map(s => String(s).trim()).filter(Boolean)
                     : String(data.nmDays).split(',').map(s => s.trim()).filter(Boolean);
-                if (JSON.stringify(arrDias) !== JSON.stringify(cfg.nmDays)) {
+                const actualDias = Array.isArray(cfg.nmDays) ? cfg.nmDays.map(s => String(s).trim()) : [];
+                if (JSON.stringify(arrDias) !== JSON.stringify(actualDias)) {
                     cfg.nmDays = arrDias;
                     cambiado = true;
                 }
@@ -617,6 +608,9 @@
                 localStorage.setItem('lu_tank_config', JSON.stringify(cfg));
                 renderPlanText();
                 actualizarCuentaRegresiva();
+                if (!document.getElementById('quick-edit-panel').classList.contains('hidden')) {
+                    cargarFormularioRapido();
+                }
             }
         }
 
@@ -757,6 +751,7 @@
 
             fetch('/config', {
                 method: 'POST',
+                cache: 'no-store',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cfg)
             }).catch(() => {});
@@ -972,7 +967,7 @@
         });
 
         function fetchESP32Status() {
-            fetch('/status')
+            fetch('/status', { cache: 'no-store' })
                 .then(res => res.json())
                 .then(data => {
                     if (!client.isConnected()) {
