@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -199,8 +199,17 @@
                     </div>
 
                     <div>
-                        <label for="pump-alternate-hours" style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 2px;">🔄 LAPSO PARA ALTERNAR BOMBAS (HORAS):</label>
-                        <input type="number" min="1" max="168" id="pump-alternate-hours" value="6" style="padding: 6px; font-size: 0.85rem;" required>
+                        <label style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 4px;">🔄 LAPSO PARA ALTERNAR BOMBAS:</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                                <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">HORAS</span>
+                                <input type="number" min="0" max="168" id="pump-alternate-hours" value="6" style="padding: 5px; font-size: 0.85rem;" required>
+                            </div>
+                            <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
+                                <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">MINUTOS</span>
+                                <select id="pump-alternate-minutes" style="padding: 5px; font-size: 0.85rem;"></select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -335,7 +344,7 @@
                 }
             });
 
-            ['rest-start-m', 'rest-end-m', 'work-start-m', 'work-end-m', 'nm-start-m', 'nm-end-m'].forEach(id => {
+            ['rest-start-m', 'rest-end-m', 'work-start-m', 'work-end-m', 'nm-start-m', 'nm-end-m', 'pump-alternate-minutes'].forEach(id => {
                 const sel = document.getElementById(id);
                 sel.innerHTML = '';
                 for (let m = 0; m < 60; m++) {
@@ -351,6 +360,7 @@
             document.getElementById('rest-start-m').value = '00';
             document.getElementById('rest-end-h').value = 5;
             document.getElementById('rest-end-m').value = '00';
+            document.getElementById('pump-alternate-minutes').value = '00';
             document.getElementById('nm-start-h').value = 8;
             document.getElementById('nm-start-m').value = '00';
             document.getElementById('nm-end-h').value = 5;
@@ -448,6 +458,13 @@
                 return;
             }
 
+            const altHours = parseInt(document.getElementById('pump-alternate-hours').value, 10);
+            const altMins = parseInt(document.getElementById('pump-alternate-minutes').value, 10);
+            if (modelSelect.value === 'presion' && (isNaN(altHours) || altHours < 0 || isNaN(altMins) || altMins < 0 || (altHours === 0 && altMins === 0))) {
+                alert('Introduce un lapso válido de alternancia (mínimo 1 minuto).');
+                return;
+            }
+
             const selectedDays = [];
             document.querySelectorAll('input[name="nm-days"]:checked').forEach(cb => {
                 selectedDays.push(cb.value);
@@ -473,6 +490,9 @@
                 rSup = parseFloat(document.getElementById('radio_sup_cono').value) || 0;
             }
 
+            const safeAltHours = isNaN(altHours) ? 6 : altHours;
+            const safeAltMins = isNaN(altMins) ? 0 : altMins;
+
             const configData = {
                 model: modelSelect.value,
                 restStartH: parseInt(document.getElementById('rest-start-h').value),
@@ -492,7 +512,9 @@
                 restTime: `${document.getElementById('rest-start-h').value}:${document.getElementById('rest-start-m').value} ${document.getElementById('rest-start-ampm').value} a ${document.getElementById('rest-end-h').value}:${document.getElementById('rest-end-m').value} ${document.getElementById('rest-end-ampm').value}`,
                 workTime: `${document.getElementById('work-start-h').value}:${document.getElementById('work-start-m').value} ${document.getElementById('work-start-ampm').value} a ${document.getElementById('work-end-h').value}:${document.getElementById('work-end-m').value} ${document.getElementById('work-end-ampm').value}`,
                 
-                pumpAlternateHours: parseInt(document.getElementById('pump-alternate-hours').value) || 6,
+                pumpAlternateHours: safeAltHours,
+                pumpAlternateMinutes: safeAltMins,
+                pumpAlternateIntervalMins: (safeAltHours * 60) + safeAltMins,
 
                 nmDays: selectedDays,
                 nmStartH: parseInt(document.getElementById('nm-start-h').value),

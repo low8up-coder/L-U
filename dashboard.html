@@ -362,8 +362,17 @@
                         </div>
 
                         <div style="margin-bottom: 8px;">
-                            <span class="qe-label" style="color: var(--accent-color);">🔄 LAPSO PARA ALTERNAR BOMBAS (HORAS)</span>
-                            <input type="number" min="1" max="168" id="qe-pump-alternate" class="qe-input" value="6">
+                            <span class="qe-label" style="color: var(--accent-color);">🔄 LAPSO PARA ALTERNAR BOMBAS</span>
+                            <div class="qe-grid" style="margin-bottom: 0;">
+                                <div class="qe-box">
+                                    <span class="qe-sub">HORAS</span>
+                                    <input type="number" min="0" max="168" id="qe-pump-alternate" class="qe-input" value="6">
+                                </div>
+                                <div class="qe-box">
+                                    <span class="qe-sub">MINUTOS</span>
+                                    <select id="qe-pump-alternate-m" class="qe-select"></select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -510,6 +519,8 @@
             restTime: '12:00 AM a 5:00 AM',
             workTime: '5:00 AM a 12:00 PM',
             pumpAlternateHours: 6,
+            pumpAlternateMinutes: 0,
+            pumpAlternateIntervalMins: 360,
             nmDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
             nmStartH: 8, nmStartM: 0, nmStartAmPm: 'AM',
             nmEndH: 5, nmEndM: 0, nmEndAmPm: 'PM',
@@ -529,6 +540,12 @@
             return String(m).padStart(2, '0');
         }
 
+        function formatAlternanciaTexto(h, m) {
+            const horas = Math.max(0, parseInt(h || 0, 10));
+            const mins = Math.max(0, parseInt(m || 0, 10));
+            return `${horas}h ${formatMin(mins)}m`;
+        }
+
         ['qe-rest-start-h', 'qe-rest-end-h', 'qe-work-start-h', 'qe-work-end-h', 'qe-nm-start-h', 'qe-nm-end-h'].forEach(id => {
             const sel = document.getElementById(id);
             for (let i = 1; i <= 12; i++) {
@@ -539,7 +556,7 @@
             }
         });
 
-        ['qe-rest-start-m', 'qe-rest-end-m', 'qe-work-start-m', 'qe-work-end-m', 'qe-nm-start-m', 'qe-nm-end-m'].forEach(id => {
+        ['qe-rest-start-m', 'qe-rest-end-m', 'qe-work-start-m', 'qe-work-end-m', 'qe-nm-start-m', 'qe-nm-end-m', 'qe-pump-alternate-m'].forEach(id => {
             const sel = document.getElementById(id);
             for (let m = 0; m < 60; m++) {
                 const val = formatMin(m);
@@ -615,9 +632,27 @@
                 }
                 cambiado = true;
             }
-            if (data.pumpAlternateHours !== undefined && Number(data.pumpAlternateHours) !== Number(cfg.pumpAlternateHours)) {
-                cfg.pumpAlternateHours = Number(data.pumpAlternateHours);
-                cambiado = true;
+            if (data.pumpAlternateIntervalMins !== undefined) {
+                const totalMins = Math.max(1, parseInt(data.pumpAlternateIntervalMins, 10) || 1);
+                const hCalc = Math.floor(totalMins / 60);
+                const mCalc = totalMins % 60;
+                if (hCalc !== Number(cfg.pumpAlternateHours) || mCalc !== Number(cfg.pumpAlternateMinutes || 0)) {
+                    cfg.pumpAlternateHours = hCalc;
+                    cfg.pumpAlternateMinutes = mCalc;
+                    cfg.pumpAlternateIntervalMins = totalMins;
+                    cambiado = true;
+                }
+            } else {
+                if (data.pumpAlternateHours !== undefined && Number(data.pumpAlternateHours) !== Number(cfg.pumpAlternateHours)) {
+                    cfg.pumpAlternateHours = Number(data.pumpAlternateHours);
+                    cfg.pumpAlternateIntervalMins = (cfg.pumpAlternateHours * 60) + (Number(cfg.pumpAlternateMinutes || 0));
+                    cambiado = true;
+                }
+                if (data.pumpAlternateMinutes !== undefined && Number(data.pumpAlternateMinutes) !== Number(cfg.pumpAlternateMinutes || 0)) {
+                    cfg.pumpAlternateMinutes = Number(data.pumpAlternateMinutes);
+                    cfg.pumpAlternateIntervalMins = (Number(cfg.pumpAlternateHours || 0) * 60) + cfg.pumpAlternateMinutes;
+                    cambiado = true;
+                }
             }
             if (data.nmDays !== undefined) {
                 const arrDias = Array.isArray(data.nmDays)
@@ -653,8 +688,12 @@
 
         function renderPlanText() {
             if (cfg.model === 'presion') {
+                const altTexto = formatAlternanciaTexto(
+                    cfg.pumpAlternateHours !== undefined ? cfg.pumpAlternateHours : 6,
+                    cfg.pumpAlternateMinutes !== undefined ? cfg.pumpAlternateMinutes : 0
+                );
                 document.getElementById('dash-plan-title').textContent = 'Modelo: Presión Constante';
-                document.getElementById('dash-plan-desc').innerHTML = `🌙 <strong>Descanso:</strong> ${cfg.restTime}<br>⚡ <strong>Trabajo:</strong> ${cfg.workTime}<br>🔄 <strong>Alternancia:</strong> Cada ${cfg.pumpAlternateHours}h`;
+                document.getElementById('dash-plan-desc').innerHTML = `🌙 <strong>Descanso:</strong> ${cfg.restTime}<br>⚡ <strong>Trabajo:</strong> ${cfg.workTime}<br>🔄 <strong>Alternancia:</strong> Cada ${altTexto}`;
             } else {
                 document.getElementById('dash-plan-title').textContent = 'Modelo: Modo Normal (NM)';
                 const diasStr = (cfg.nmDays && cfg.nmDays.length > 0) ? cfg.nmDays.join(', ') : 'Ninguno';
@@ -692,7 +731,8 @@
             document.getElementById('qe-rest-end-ampm').value = cfg.restEndAmPm || 'AM';
 
             sincronizarHorariosDashboard();
-            document.getElementById('qe-pump-alternate').value = cfg.pumpAlternateHours || 6;
+            document.getElementById('qe-pump-alternate').value = cfg.pumpAlternateHours !== undefined ? cfg.pumpAlternateHours : 6;
+            document.getElementById('qe-pump-alternate-m').value = formatMin(cfg.pumpAlternateMinutes || 0);
 
             const diasActuales = cfg.nmDays || ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
             document.querySelectorAll('input[name="qe-nm-days"]').forEach(cb => {
@@ -727,12 +767,15 @@
             cfg.model = modeloElegido;
 
             if (cfg.model === 'presion') {
-                const altHours = parseInt(document.getElementById('qe-pump-alternate').value);
-                if (!altHours || altHours < 1) {
-                    alert('Introduce un lapso válido de horas (mínimo 1 hora).');
+                const altHours = parseInt(document.getElementById('qe-pump-alternate').value, 10);
+                const altMins = parseInt(document.getElementById('qe-pump-alternate-m').value, 10);
+                if (isNaN(altHours) || altHours < 0 || isNaN(altMins) || altMins < 0 || (altHours === 0 && altMins === 0)) {
+                    alert('Introduce un lapso válido de alternancia (mínimo 1 minuto).');
                     return;
                 }
                 cfg.pumpAlternateHours = altHours;
+                cfg.pumpAlternateMinutes = altMins;
+                cfg.pumpAlternateIntervalMins = (altHours * 60) + altMins;
 
                 cfg.restStartH = parseInt(document.getElementById('qe-rest-start-h').value);
                 cfg.restStartM = parseInt(document.getElementById('qe-rest-start-m').value);
@@ -1032,4 +1075,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
