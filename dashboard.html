@@ -295,11 +295,11 @@
             <div class="pumps-container" id="pumps-status-container">
                 <div class="pump-card">
                     <div class="pump-name">Bomba / Relé 1</div>
-                    <div class="pump-status status-descanso" id="pump-1-state">En Descanso</div>
+                    <div class="pump-status status-descanso" id="pump-1-state">Apagado (OFF)</div>
                 </div>
                 <div class="pump-card">
                     <div class="pump-name">Bomba / Relé 2</div>
-                    <div class="pump-status status-trabajo" id="pump-2-state">Trabajo</div>
+                    <div class="pump-status status-descanso" id="pump-2-state">Apagado (OFF)</div>
                 </div>
             </div>
 
@@ -430,11 +430,13 @@
         
         let clientId = "WebClient_" + Math.random().toString(16).substring(2, 8);
         let client = new Paho.MQTT.Client(mqtt_host, Number(mqtt_port), "/mqtt", clientId);
+        let reconnectTimer = null;
+        let bloqueoSyncHasta = 0;
 
         client.onConnectionLost = function(responseObject) {
             if (responseObject.errorCode !== 0) {
                 console.warn("MQTT desconectado:", responseObject.errorMessage);
-                setTimeout(conectarMQTT, 4000);
+                agendarReconexionMQTT();
             }
         };
 
@@ -442,9 +444,11 @@
             if (message.destinationName === "lu/tank/telemetry") {
                 try {
                     let data = JSON.parse(message.payloadString);
-                    manualPump1 = (data.pump1 === 1);
-                    manualPump2 = (data.pump2 === 1);
-                    actualizarEstadoRelesWeb();
+                    if (Date.now() >= bloqueoSyncHasta) {
+                        manualPump1 = (data.pump1 === 1);
+                        manualPump2 = (data.pump2 === 1);
+                        actualizarEstadoRelesWeb();
+                    }
                     sincronizarPlanDesdeESP32(data);
                     actualizarDashboardVisual(data);
                 } catch(e) {
@@ -453,7 +457,16 @@
             }
         };
 
+        function agendarReconexionMQTT() {
+            if (reconnectTimer) return;
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                conectarMQTT();
+            }, 4000);
+        }
+
         function conectarMQTT() {
+            if (client.isConnected()) return;
             let options = {
                 invocationContext: {host: mqtt_host, port: Number(mqtt_port), clientId: clientId},
                 timeout: 5,
@@ -466,10 +479,14 @@
                 },
                 onFailure: function(message) {
                     console.warn("Fallo conexion MQTT WSS:", message.errorMessage);
-                    setTimeout(conectarMQTT, 4000);
+                    agendarReconexionMQTT();
                 }
             };
-            client.connect(options);
+            try {
+                client.connect(options);
+            } catch (e) {
+                agendarReconexionMQTT();
+            }
         }
 
         conectarMQTT();
@@ -917,7 +934,7 @@
                 btnPump1.className = 'btn pump-on';
                 btnPump1.textContent = '🛑 Bomba 1: ON';
             } else {
-                r1State.textContent = 'En Descanso';
+                r1State.textContent = 'Apagado (OFF)';
                 r1State.className = 'pump-status status-descanso';
                 btnPump1.className = 'btn pump-off';
                 btnPump1.textContent = '⚡ Bomba 1: OFF';
@@ -929,7 +946,7 @@
                 btnPump2.className = 'btn pump-on';
                 btnPump2.textContent = '🛑 Bomba 2: ON';
             } else {
-                r2State.textContent = 'En Descanso';
+                r2State.textContent = 'Apagado (OFF)';
                 r2State.className = 'pump-status status-descanso';
                 btnPump2.className = 'btn pump-off';
                 btnPump2.textContent = '⚡ Bomba 2: OFF';
@@ -950,6 +967,7 @@
 
         btnPump1.addEventListener('click', () => {
             manualPump1 = !manualPump1;
+            bloqueoSyncHasta = Date.now() + 1500;
             actualizarEstadoRelesWeb();
             enviarComandoRemoto("lu/tank/set", { pump1: manualPump1 });
             fetch(`/pump1?state=${manualPump1 ? '1' : '0'}`).catch(() => {});
@@ -957,6 +975,7 @@
 
         btnPump2.addEventListener('click', () => {
             manualPump2 = !manualPump2;
+            bloqueoSyncHasta = Date.now() + 1500;
             actualizarEstadoRelesWeb();
             enviarComandoRemoto("lu/tank/set", { pump2: manualPump2 });
             fetch(`/pump2?state=${manualPump2 ? '1' : '0'}`).catch(() => {});
@@ -966,6 +985,7 @@
             const estadoGlobal = !(manualPump1 && manualPump2);
             manualPump1 = estadoGlobal;
             manualPump2 = estadoGlobal;
+            bloqueoSyncHasta = Date.now() + 1500;
             actualizarEstadoRelesWeb();
             enviarComandoRemoto("lu/tank/set", { pumpAll: estadoGlobal });
             fetch(`/pumpAll?state=${estadoGlobal ? '1' : '0'}`).catch(() => {});
@@ -975,7 +995,7 @@
             fetch('/status', { cache: 'no-store' })
                 .then(res => res.json())
                 .then(data => {
-                    if (!client.isConnected()) {
+                    if (!client.isConnected() && Date.now() >= bloqueoSyncHasta) {
                         manualPump1 = (data.pump1 === 1);
                         manualPump2 = (data.pump2 === 1);
                         actualizarEstadoRelesWeb();
@@ -986,10 +1006,8 @@
                 .catch(() => {});
         }
 
-        setInterval(() => {
-            fetchESP32Status();
-            actualizarCuentaRegresiva();
-        }, 500);
+        setInterval(actualizarCuentaRegresiva, 500);
+        setInterval(fetchESP32Status, 1500);
 
         fetchESP32Status();
         actualizarCuentaRegresiva();
