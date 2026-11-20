@@ -1,10 +1,9 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>L&U Controller - Configuración</title>
-    <!-- Librería MQTT para JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     <style>
         :root {
@@ -164,16 +163,16 @@
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO DESCANSO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="rest-start-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12" selected>12</option></select>
-                                <select id="rest-start-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="rest-start-h" style="padding: 4px; font-size: 0.8rem;"></select>
+                                <select id="rest-start-m" style="padding: 4px; font-size: 0.8rem;"></select>
                                 <select id="rest-start-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
                             </div>
                         </div>
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN DESCANSO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="rest-end-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
-                                <select id="rest-end-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="rest-end-h" style="padding: 4px; font-size: 0.8rem;"></select>
+                                <select id="rest-end-m" style="padding: 4px; font-size: 0.8rem;"></select>
                                 <select id="rest-end-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
                             </div>
                         </div>
@@ -184,17 +183,17 @@
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO TRABAJO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="work-start-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="5" selected>5</option></select>
-                                <select id="work-start-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="00" selected>00</option></select>
-                                <select id="work-start-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="AM" selected>AM</option></select>
+                                <select id="work-start-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"></select>
+                                <select id="work-start-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"></select>
+                                <select id="work-start-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
                             </div>
                         </div>
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN TRABAJO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="work-end-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="12" selected>12</option></select>
-                                <select id="work-end-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="00" selected>00</option></select>
-                                <select id="work-end-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="PM" selected>PM</option></select>
+                                <select id="work-end-h" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"></select>
+                                <select id="work-end-m" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"></select>
+                                <select id="work-end-ampm" disabled style="padding: 4px; font-size: 0.8rem; opacity: 0.8;"><option value="AM">AM</option><option value="PM" selected>PM</option></select>
                             </div>
                         </div>
                     </div>
@@ -227,16 +226,16 @@
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">INICIO TRABAJO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="nm-start-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
-                                <select id="nm-start-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="nm-start-h" style="padding: 4px; font-size: 0.8rem;"></select>
+                                <select id="nm-start-m" style="padding: 4px; font-size: 0.8rem;"></select>
                                 <select id="nm-start-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM" selected>AM</option><option value="PM">PM</option></select>
                             </div>
                         </div>
                         <div style="background: var(--card-inner); padding: 6px; border-radius: 6px;">
                             <span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-bottom: 2px;">FIN TRABAJO</span>
                             <div style="display: flex; gap: 2px;">
-                                <select id="nm-end-h" style="padding: 4px; font-size: 0.8rem;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
-                                <select id="nm-end-m" style="padding: 4px; font-size: 0.8rem;"><option value="00" selected>00</option><option value="30">30</option></select>
+                                <select id="nm-end-h" style="padding: 4px; font-size: 0.8rem;"></select>
+                                <select id="nm-end-m" style="padding: 4px; font-size: 0.8rem;"></select>
                                 <select id="nm-end-ampm" style="padding: 4px; font-size: 0.8rem;"><option value="AM">AM</option><option value="PM" selected>PM</option></select>
                             </div>
                         </div>
@@ -300,7 +299,6 @@
     </div>
 
     <script>
-        // Configuración MQTT Web para respaldo remoto
         const mqtt_host = "de96f323.ala.us-east-1.emqxsl.com";
         const mqtt_port = 8084;
         const mqtt_user = "Admin";
@@ -321,6 +319,46 @@
             onFailure: function() { console.log("Fallo MQTT en Index"); }
         });
 
+        function formatMin(m) {
+            return String(m).padStart(2, '0');
+        }
+
+        function poblarSelectoresHoraMinuto() {
+            ['rest-start-h', 'rest-end-h', 'work-start-h', 'work-end-h', 'nm-start-h', 'nm-end-h'].forEach(id => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = '';
+                for (let h = 1; h <= 12; h++) {
+                    const opt = document.createElement('option');
+                    opt.value = h;
+                    opt.textContent = h;
+                    sel.appendChild(opt);
+                }
+            });
+
+            ['rest-start-m', 'rest-end-m', 'work-start-m', 'work-end-m', 'nm-start-m', 'nm-end-m'].forEach(id => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = '';
+                for (let m = 0; m < 60; m++) {
+                    const val = formatMin(m);
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val;
+                    sel.appendChild(opt);
+                }
+            });
+
+            document.getElementById('rest-start-h').value = 12;
+            document.getElementById('rest-start-m').value = '00';
+            document.getElementById('rest-end-h').value = 5;
+            document.getElementById('rest-end-m').value = '00';
+            document.getElementById('nm-start-h').value = 8;
+            document.getElementById('nm-start-m').value = '00';
+            document.getElementById('nm-end-h').value = 5;
+            document.getElementById('nm-end-m').value = '00';
+        }
+
+        poblarSelectoresHoraMinuto();
+
         const tankSelect = document.getElementById('tank');
         const modelSelect = document.getElementById('model');
         const presionScheduleGroup = document.getElementById('presion-schedule-group');
@@ -340,13 +378,13 @@
             const restStartM = document.getElementById('rest-start-m').value;
             const restStartAmPm = document.getElementById('rest-start-ampm').value;
 
-            document.getElementById('work-start-h').innerHTML = `<option value="${restEndH}" selected>${restEndH}</option>`;
-            document.getElementById('work-start-m').innerHTML = `<option value="${restEndM}" selected>${restEndM}</option>`;
-            document.getElementById('work-start-ampm').innerHTML = `<option value="${restEndAmPm}" selected>${restEndAmPm}</option>`;
+            document.getElementById('work-start-h').value = restEndH;
+            document.getElementById('work-start-m').value = restEndM;
+            document.getElementById('work-start-ampm').value = restEndAmPm;
 
-            document.getElementById('work-end-h').innerHTML = `<option value="${restStartH}" selected>${restStartH}</option>`;
-            document.getElementById('work-end-m').innerHTML = `<option value="${restStartM}" selected>${restStartM}</option>`;
-            document.getElementById('work-end-ampm').innerHTML = `<option value="${restStartAmPm}" selected>${restStartAmPm}</option>`;
+            document.getElementById('work-end-h').value = restStartH;
+            document.getElementById('work-end-m').value = restStartM;
+            document.getElementById('work-end-ampm').value = restStartAmPm;
         }
 
         ['rest-start-h', 'rest-start-m', 'rest-start-ampm', 'rest-end-h', 'rest-end-m', 'rest-end-ampm'].forEach(id => {
@@ -379,7 +417,6 @@
         tankSelect.addEventListener('change', updateTankBlocks);
         modelSelect.addEventListener('change', updateModelFields);
 
-        // Cargar configuración de red local o desde memoria local si no hay conexión local
         fetch('/status')
             .then(res => res.json())
             .then(data => {
@@ -390,7 +427,6 @@
                     updateTankBlocks();
                 }
             }).catch(() => {
-                // Si falla porque estamos fuera de casa, lee la última configuración guardada
                 const localCfg = localStorage.getItem('lu_tank_config');
                 if (localCfg) {
                     let c = JSON.parse(localCfg);
@@ -480,7 +516,6 @@
 
             localStorage.setItem('lu_tank_config', JSON.stringify(configData));
 
-            // Si está conectado por MQTT en la nube, publica la configuración o envía por fetch local
             if (client && client.isConnected()) {
                 let message = new Paho.MQTT.Message(JSON.stringify(configData));
                 message.destinationName = "lu/tank/set";

@@ -327,7 +327,7 @@
                                 <span class="qe-sub">INICIO DESCANSO</span>
                                 <div class="qe-row">
                                     <select id="qe-rest-start-h" class="qe-select"></select>
-                                    <select id="qe-rest-start-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-rest-start-m" class="qe-select"></select>
                                     <select id="qe-rest-start-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -335,7 +335,7 @@
                                 <span class="qe-sub">FIN DESCANSO</span>
                                 <div class="qe-row">
                                     <select id="qe-rest-end-h" class="qe-select"></select>
-                                    <select id="qe-rest-end-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-rest-end-m" class="qe-select"></select>
                                     <select id="qe-rest-end-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -347,7 +347,7 @@
                                 <span class="qe-sub">INICIO TRABAJO</span>
                                 <div class="qe-row">
                                     <select id="qe-work-start-h" disabled class="qe-select" style="opacity: 0.8;"></select>
-                                    <select id="qe-work-start-m" disabled class="qe-select" style="opacity: 0.8;"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-work-start-m" disabled class="qe-select" style="opacity: 0.8;"></select>
                                     <select id="qe-work-start-ampm" disabled class="qe-select" style="opacity: 0.8;"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -355,7 +355,7 @@
                                 <span class="qe-sub">FIN TRABAJO</span>
                                 <div class="qe-row">
                                     <select id="qe-work-end-h" disabled class="qe-select" style="opacity: 0.8;"></select>
-                                    <select id="qe-work-end-m" disabled class="qe-select" style="opacity: 0.8;"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-work-end-m" disabled class="qe-select" style="opacity: 0.8;"></select>
                                     <select id="qe-work-end-ampm" disabled class="qe-select" style="opacity: 0.8;"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -385,7 +385,7 @@
                                 <span class="qe-sub">INICIO TRABAJO</span>
                                 <div class="qe-row">
                                     <select id="qe-nm-start-h" class="qe-select"></select>
-                                    <select id="qe-nm-start-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-nm-start-m" class="qe-select"></select>
                                     <select id="qe-nm-start-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -393,7 +393,7 @@
                                 <span class="qe-sub">FIN TRABAJO</span>
                                 <div class="qe-row">
                                     <select id="qe-nm-end-h" class="qe-select"></select>
-                                    <select id="qe-nm-end-m" class="qe-select"><option value="00">00</option><option value="30">30</option></select>
+                                    <select id="qe-nm-end-m" class="qe-select"></select>
                                     <select id="qe-nm-end-ampm" class="qe-select"><option value="AM">AM</option><option value="PM">PM</option></select>
                                 </div>
                             </div>
@@ -525,12 +525,27 @@
             radio_sup_cono: 45
         };
 
+        function formatMin(m) {
+            return String(m).padStart(2, '0');
+        }
+
         ['qe-rest-start-h', 'qe-rest-end-h', 'qe-work-start-h', 'qe-work-end-h', 'qe-nm-start-h', 'qe-nm-end-h'].forEach(id => {
             const sel = document.getElementById(id);
             for (let i = 1; i <= 12; i++) {
                 const opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = i;
+                sel.appendChild(opt);
+            }
+        });
+
+        ['qe-rest-start-m', 'qe-rest-end-m', 'qe-work-start-m', 'qe-work-end-m', 'qe-nm-start-m', 'qe-nm-end-m'].forEach(id => {
+            const sel = document.getElementById(id);
+            for (let m = 0; m < 60; m++) {
+                const val = formatMin(m);
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
                 sel.appendChild(opt);
             }
         });
@@ -544,13 +559,13 @@
             const restStartM = document.getElementById('qe-rest-start-m').value;
             const restStartAmPm = document.getElementById('qe-rest-start-ampm').value;
 
-            document.getElementById('qe-work-start-h').innerHTML = `<option value="${restEndH}" selected>${restEndH}</option>`;
-            document.getElementById('qe-work-start-m').innerHTML = `<option value="${restEndM}" selected>${restEndM}</option>`;
-            document.getElementById('qe-work-start-ampm').innerHTML = `<option value="${restEndAmPm}" selected>${restEndAmPm}</option>`;
+            document.getElementById('qe-work-start-h').value = restEndH;
+            document.getElementById('qe-work-start-m').value = restEndM;
+            document.getElementById('qe-work-start-ampm').value = restEndAmPm;
 
-            document.getElementById('qe-work-end-h').innerHTML = `<option value="${restStartH}" selected>${restStartH}</option>`;
-            document.getElementById('qe-work-end-m').innerHTML = `<option value="${restStartM}" selected>${restStartM}</option>`;
-            document.getElementById('qe-work-end-ampm').innerHTML = `<option value="${restStartAmPm}" selected>${restStartAmPm}</option>`;
+            document.getElementById('qe-work-end-h').value = restStartH;
+            document.getElementById('qe-work-end-m').value = restStartM;
+            document.getElementById('qe-work-end-ampm').value = restStartAmPm;
         }
 
         ['qe-rest-start-h', 'qe-rest-start-m', 'qe-rest-start-ampm', 'qe-rest-end-h', 'qe-rest-end-m', 'qe-rest-end-ampm'].forEach(id => {
@@ -648,10 +663,6 @@
         }
 
         renderPlanText();
-
-        function formatMin(m) {
-            return String(m).padStart(2, '0');
-        }
 
         function alternarVisibilidadCamposPlan(modeloSeleccionado) {
             if (modeloSeleccionado === 'presion') {
@@ -1021,4 +1032,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
